@@ -116,8 +116,8 @@ class DictionaryScreen extends StatelessWidget {
                     pageBuilder: (context, anim1, anim2) {
                       final screenW = MediaQuery.of(context).size.width;
                       final screenH = MediaQuery.of(context).size.height;
-                      final maxW = screenW * 0.97;
-                      final maxH = screenH * 0.9;
+                      final maxW = screenW * 0.99;
+                      final maxH = screenH * 0.97;
                       return GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () => Navigator.of(context).pop(), // tap outside closes
@@ -143,23 +143,23 @@ class DictionaryScreen extends StatelessWidget {
                                                 Image.asset(word['image']!, height: 180, fit: BoxFit.contain)
                                               else
                                                 Container(
-                                                  width: 180,
-                                                  height: 180,
+                                                  width: 230,
+                                                  height: 230,
                                                   decoration: BoxDecoration(
                                                     color: Colors.blue[50],
                                                     borderRadius: BorderRadius.circular(16),
                                                   ),
-                                                  child: const Icon(Icons.image, size: 88, color: Colors.blueGrey),
+                                                  child: const Icon(Icons.image, size: 120, color: Colors.blueGrey),
                                                 ),
+                                              const SizedBox(height: 22),
+                                              Text(word['word'] ?? '', style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold)),
+                                              const SizedBox(height: 12),
+                                              Text(word['phonetic'] ?? '', style: const TextStyle(fontSize: 24, color: Colors.grey)),
                                               const SizedBox(height: 18),
-                                              Text(word['word'] ?? '', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                                              const SizedBox(height: 8),
-                                              Text(word['phonetic'] ?? '', style: const TextStyle(fontSize: 18, color: Colors.grey)),
+                                              Text(word['meaning'] ?? '', style: const TextStyle(fontSize: 28)),
+                                              const SizedBox(height: 18),
+                                              Text(word['example'] ?? '', style: const TextStyle(fontSize: 20, fontStyle: FontStyle.italic, color: Colors.black87)),
                                               const SizedBox(height: 14),
-                                              Text(word['meaning'] ?? '', style: const TextStyle(fontSize: 20)),
-                                              const SizedBox(height: 14),
-                                              Text(word['example'] ?? '', style: const TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: Colors.black87)),
-                                              const SizedBox(height: 10),
                                             ],
                                           ),
                                         ),

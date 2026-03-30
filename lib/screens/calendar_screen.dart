@@ -111,26 +111,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header
+              // Header — removed close and arrow; title is tappable to open month selector
               Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Icon(Icons.close, size: 28),
-                  ),
                   Expanded(
                     child: Center(
-                      child: Text(
-                        'Study calendar',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                      child: GestureDetector(
+                        onTap: _onNextMonth,
+                        child: Text(
+                          'Study calendar',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                        ),
                       ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: GestureDetector(
-                      onTap: _onNextMonth,
-                      child: Icon(Icons.arrow_forward_ios, size: 24),
                     ),
                   ),
                 ],
@@ -210,7 +202,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         children: const [
                           Text('Monthly progress', style: TextStyle(fontWeight: FontWeight.bold)),
                           SizedBox(height: 8),
-                          Text('You studied for 25 days!', style: TextStyle(fontSize: 18)),
+                          Text('You studied for 0 days!', style: TextStyle(fontSize: 18)),
                         ],
                       ),
                     ),
