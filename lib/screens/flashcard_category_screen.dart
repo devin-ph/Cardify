@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flip_card/flip_card.dart';
 
 class FlashcardScreen extends StatefulWidget {
+  const FlashcardScreen({super.key});
+
   @override
   State<FlashcardScreen> createState() => _FlashcardScreenState();
 }
 
 class _FlashcardScreenState extends State<FlashcardScreen> {
-  final List<String> deckNames = ['Academic IELTS', 'Business English', 'TOEIC'];
+  final List<String> deckNames = [
+    'Academic IELTS',
+    'Business English',
+    'TOEIC',
+  ];
   int selectedDeck = 0;
   final List<List<Flashcard>> allFlashcards = [
     [
@@ -60,18 +66,21 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   SizedBox(width: 8),
-                  Text('Study Decks', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Study Decks',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             ),
             // Deck list
-            Container(
+            SizedBox(
               height: 48,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 itemCount: deckNames.length,
-                separatorBuilder: (_, __) => SizedBox(width: 12),
+                separatorBuilder: (_, _) => SizedBox(width: 12),
                 itemBuilder: (context, index) {
                   final isSelected = selectedDeck == index;
                   return InkWell(
@@ -83,12 +92,19 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                     },
                     child: Chip(
                       label: Text(deckNames[index]),
-                      backgroundColor: isSelected ? Color(0xFF0A5DB6) : Colors.white,
+                      backgroundColor: isSelected
+                          ? Color(0xFF0A5DB6)
+                          : Colors.white,
                       labelStyle: TextStyle(
                         color: isSelected ? Colors.white : Color(0xFF0A5DB6),
                         fontWeight: FontWeight.bold,
                       ),
-                      avatar: Icon(Icons.school, color: isSelected ? Colors.white : Color.fromARGB(255, 150, 197, 247)),
+                      avatar: Icon(
+                        Icons.school,
+                        color: isSelected
+                            ? Colors.white
+                            : Color.fromARGB(255, 150, 197, 247),
+                      ),
                     ),
                   );
                 },
@@ -126,12 +142,20 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Color(0xFF0A5DB6),
-                              side: BorderSide(color: Color(0xFF0A5DB6), width: 2),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              side: BorderSide(
+                                color: Color(0xFF0A5DB6),
+                                width: 2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               padding: EdgeInsets.symmetric(vertical: 27),
                             ),
                             onPressed: () {},
-                            child: Text('Review later', style: TextStyle(fontWeight: FontWeight.bold)),
+                            child: Text(
+                              'Review later',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                         SizedBox(width: 16),
@@ -140,7 +164,9 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Color(0xFF0A5DB6),
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               padding: EdgeInsets.symmetric(vertical: 27),
                             ),
                             onPressed: () {
@@ -148,7 +174,10 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                 const SnackBar(content: Text('Đã biết')),
                               );
                             },
-                            child: Text('I know', style: TextStyle(fontWeight: FontWeight.bold)),
+                            child: Text(
+                              'I know',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                       ],
@@ -172,14 +201,25 @@ class Flashcard {
   final String meaning;
   final String example;
 
-  Flashcard({required this.image, required this.word, required this.phonetic, required this.meaning, required this.example});
+  Flashcard({
+    required this.image,
+    required this.word,
+    required this.phonetic,
+    required this.meaning,
+    required this.example,
+  });
 }
 
 class FlashcardFront extends StatelessWidget {
   final Flashcard flashcard;
   final double width;
   final double height;
-  const FlashcardFront({required this.flashcard, this.width = 320, this.height = 420});
+  const FlashcardFront({
+    super.key,
+    required this.flashcard,
+    this.width = 320,
+    this.height = 420,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -195,9 +235,15 @@ class FlashcardFront extends StatelessWidget {
           children: [
             Image.asset(flashcard.image, height: 120),
             SizedBox(height: 32),
-            Text(flashcard.word, style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold)),
+            Text(
+              flashcard.word,
+              style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 10),
-            Text(flashcard.phonetic, style: TextStyle(fontSize: 20, color: Colors.blueGrey)),
+            Text(
+              flashcard.phonetic,
+              style: TextStyle(fontSize: 20, color: Colors.blueGrey),
+            ),
             Spacer(),
             Align(
               alignment: Alignment.bottomRight,
@@ -219,7 +265,12 @@ class FlashcardBack extends StatelessWidget {
   final Flashcard flashcard;
   final double width;
   final double height;
-  const FlashcardBack({required this.flashcard, this.width = 320, this.height = 420});
+  const FlashcardBack({
+    super.key,
+    required this.flashcard,
+    this.width = 320,
+    this.height = 420,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -233,9 +284,15 @@ class FlashcardBack extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(flashcard.meaning, style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+            Text(
+              flashcard.meaning,
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 24),
-            Text(flashcard.example, style: TextStyle(fontSize: 20, color: Colors.black54)),
+            Text(
+              flashcard.example,
+              style: TextStyle(fontSize: 20, color: Colors.black54),
+            ),
             Spacer(),
             Align(
               alignment: Alignment.bottomRight,

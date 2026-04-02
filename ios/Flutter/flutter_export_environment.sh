@@ -1,7 +1,7 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
-export "FLUTTER_ROOT=F:\Program\flutter"
-export "FLUTTER_APPLICATION_PATH=E:\PTUD\Cardify"
+export "FLUTTER_ROOT=C:\Tools\flutter"
+export "FLUTTER_APPLICATION_PATH=C:\Users\thevi\Documents\CODE\PTUDDD\VisionVocab"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_TARGET=lib\main.dart"
 export "FLUTTER_BUILD_DIR=build"

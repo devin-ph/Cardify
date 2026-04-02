@@ -1,38 +1,23 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:http/http.dart' as http;
-
+import 'dart:convert';
 import '../models/analysis_result.dart';
 
 class NetworkService {
-  NetworkService(this.apiUrl, {http.Client? client})
-    : _client = client ?? http.Client();
-
   final String apiUrl;
-  final http.Client _client;
+  NetworkService(this.apiUrl);
 
-  Future<AnalysisResult> uploadImage(Uint8List imageBytes) async {
-    final uri = Uri.parse(apiUrl);
-    final request = http.MultipartRequest('POST', uri)
+  Future<AnalysisResult> uploadImage(List<int> imageBytes) async {
+    var request = http.MultipartRequest('POST', Uri.parse(apiUrl))
       ..files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          imageBytes,
-          filename: 'capture.jpg',
-        ),
+        http.MultipartFile.fromBytes('file', imageBytes, filename: 'image.jpg'),
       );
-
-    final streamedResponse = await _client.send(request);
+    var streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
-    final payload = response.body.isNotEmpty ? jsonDecode(response.body) : {};
-
-    if (response.statusCode == 200 && payload['data'] != null) {
-      return AnalysisResult.fromJson(payload['data']);
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body);
+      return AnalysisResult.fromJson(jsonData['data']);
+    } else {
+      throw Exception('Server error: ${response.statusCode}');
     }
-
-    final message =
-        payload['detail'] ?? payload['message'] ?? 'AI service unavailable';
-    throw Exception(message);
   }
 }

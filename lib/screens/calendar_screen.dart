@@ -21,10 +21,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _generateFakeStudyDays() {
     // Ví dụ: các ngày chia hết cho 2 hoặc 3 là có học
-    int daysInMonth = DateUtils.getDaysInMonth(_focusedDay.year, _focusedDay.month);
-    _studiedDays = List.generate(daysInMonth, (i) => i + 1)
-        .where((d) => d % 2 == 0 || d % 3 == 0)
-        .toList();
+    int daysInMonth = DateUtils.getDaysInMonth(
+      _focusedDay.year,
+      _focusedDay.month,
+    );
+    _studiedDays = List.generate(
+      daysInMonth,
+      (i) => i + 1,
+    ).where((d) => d % 2 == 0 || d % 3 == 0).toList();
   }
 
   void _onNextMonth() async {
@@ -38,13 +42,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Container(
+            return SizedBox(
               height: 420,
               child: Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text('Select month & year', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    child: Text(
+                      'Select month & year',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                   ),
                   // Năm
                   Row(
@@ -56,7 +66,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ? () => setModalState(() => selectedYear--)
                             : null,
                       ),
-                      Text('$selectedYear', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(
+                        '$selectedYear',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       IconButton(
                         icon: Icon(Icons.arrow_right),
                         onPressed: selectedYear < maxYear
@@ -73,8 +89,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       itemBuilder: (context, idx) {
                         final month = idx + 1;
                         return ListTile(
-                          title: Text(DateFormat('MMMM').format(DateTime(selectedYear, month))),
-                          selected: month == currentMonth && selectedYear == currentYear,
+                          title: Text(
+                            DateFormat(
+                              'MMMM',
+                            ).format(DateTime(selectedYear, month)),
+                          ),
+                          selected:
+                              month == currentMonth &&
+                              selectedYear == currentYear,
                           onTap: () {
                             setState(() {
                               _focusedDay = DateTime(selectedYear, month);
@@ -97,7 +119,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    int daysInMonth = DateUtils.getDaysInMonth(_focusedDay.year, _focusedDay.month);
+    int daysInMonth = DateUtils.getDaysInMonth(
+      _focusedDay.year,
+      _focusedDay.month,
+    );
     DateTime firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
     int startWeekday = firstDayOfMonth.weekday; // 1 (Mon) -> 7 (Sun)
     int totalCells = daysInMonth + (startWeekday - 1);
@@ -116,13 +141,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 children: [
                   Expanded(
                     child: Center(
-                      child: GestureDetector(
-                        onTap: _onNextMonth,
-                        child: Text(
-                          'Study calendar',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                      child: Text(
+                        'Study calendar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
                         ),
                       ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: GestureDetector(
+                      onTap: _onNextMonth,
+                      child: Icon(Icons.arrow_forward_ios, size: 24),
                     ),
                   ),
                 ],
@@ -131,7 +163,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
               Center(
                 child: Text(
                   DateFormat('MMMM yyyy').format(_focusedDay),
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blueGrey),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.blueGrey,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -171,15 +207,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         border: Border.all(color: Colors.grey[300]!),
                       ),
                       child: isValidDay
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('$dayNum', style: TextStyle(fontWeight: FontWeight.bold)),
-                                SizedBox(height: 4),
-                                studied
-                                    ? Icon(Icons.check_circle, color: Colors.green, size: 22)
-                                    : Icon(Icons.remove_circle_outline, color: Colors.grey, size: 22),
-                              ],
+                          ? FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '$dayNum',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  SizedBox(height: 2),
+                                  studied
+                                      ? Icon(
+                                          Icons.check_circle,
+                                          color: Colors.green,
+                                          size: 18,
+                                        )
+                                      : Icon(
+                                          Icons.remove_circle_outline,
+                                          color: Colors.grey,
+                                          size: 18,
+                                        ),
+                                ],
+                              ),
                             )
                           : null,
                     );
@@ -200,9 +250,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: const [
-                          Text('Monthly progress', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                            'Monthly progress',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           SizedBox(height: 8),
-                          Text('You studied for 0 days!', style: TextStyle(fontSize: 18)),
+                          Text(
+                            'You studied for 25 days!',
+                            style: TextStyle(fontSize: 18),
+                          ),
                         ],
                       ),
                     ),
@@ -218,7 +274,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ],
                 ),
               ),
-
             ],
           ),
         ),
@@ -246,7 +301,10 @@ class _StatCard extends StatelessWidget {
           children: [
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
           ],
         ),

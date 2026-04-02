@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 class EditProfileScreen extends StatefulWidget {
   final String name;
   final String email;
-  const EditProfileScreen({
-    Key? key,
-    required this.name,
-    required this.email,
-  }) : super(key: key);
+  const EditProfileScreen({super.key, required this.name, required this.email});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -32,13 +28,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _saveProfile() {
-    Navigator.of(context).pop({
-      'name': _nameController.text,
-      'email': _emailController.text,
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã lưu hồ sơ!')),
-    );
+    Navigator.of(
+      context,
+    ).pop({'name': _nameController.text, 'email': _emailController.text});
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Đã lưu hồ sơ!')));
   }
 
   @override
