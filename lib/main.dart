@@ -1,11 +1,4 @@
 import 'package:flutter/material.dart';
-<<<<<<< HEAD
-import 'package:flutter/foundation.dart';
-import 'screens/main_screen.dart';
-
-void main() {
-  runApp(MyApp());
-=======
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'firebase_options.dart';
@@ -23,7 +16,6 @@ Future<void> main() async {
     anonKey: dotenv.get('SUPABASE_ANON_KEY'),
   );
   runApp(const MyApp());
->>>>>>> 32aba5d9832476bdb4b8b3415725e0343e54a669
 }
 
 class MyApp extends StatelessWidget {
@@ -47,11 +39,7 @@ class MyApp extends StatelessWidget {
         ), // màu nền tổng thể
         useMaterial3: true,
       ),
-<<<<<<< HEAD
-      home: MainScreen(),
-=======
       home: const _AppBootstrap(),
->>>>>>> 32aba5d9832476bdb4b8b3415725e0343e54a669
     );
   }
 }

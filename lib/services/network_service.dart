@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 import 'package:http/http.dart' as http;
-=======
->>>>>>> 32aba5d9832476bdb4b8b3415725e0343e54a669
 import 'dart:convert';
 import '../models/analysis_result.dart';
 
