@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Image handling
+  camera: ^0.11.0+1
   image_picker: ^1.0.0
   image: ^4.1.0
 
@@ -44,10 +45,13 @@ dependencies:
 
   # Text-to-speech
   flutter_tts: ^4.2.5
+  speech_to_text: ^7.0.0
   flip_card: ^0.7.0
   intl: ^0.20.2
   firebase_core: ^4.6.0
   firebase_auth: ^6.3.0
+  supabase_flutter: ^2.5.6
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +73,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - .env
 
   # To add assets to your application, add an assets section, like this:
   # assets:

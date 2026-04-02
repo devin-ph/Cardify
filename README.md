@@ -1,234 +1,99 @@
-# AI English Learning App - Object Detection
+# AI English Learning App - Hugging Face Direct API
 
-Ứng dụng Flutter học tiếng Anh thông qua nhận diện đồ vật bằng camera. Ứng dụng chụp ảnh, resize, gửi tới FastAPI server để phân tích, sau đó hiển thị:
+Ung dung Flutter hoc tieng Anh thong qua nhan dien do vat bang camera. Ung dung chup anh, gui truc tiep den API tren Hugging Face Space de phan tich, sau do hien thi:
 
-- Từ tiếng Anh
-- Phiên âm IPA
-- Nghĩa tiếng Việt
-- Câu ví dụ
-- Hướng dẫn phát âm
-- Tính năng phát âm (Text-to-Speech)
+- Tu tieng Anh
+- Phien am IPA
+- Nghia tieng Viet
+- Cau vi du
+- Huong dan phat am
+- Tinh nang phat am (Text-to-Speech)
 
-## Yêu cầu hệ thống
+## Yeu cau he thong
 
 - Flutter SDK >= 3.11.1
 - Android Studio / Xcode
-- Python >= 3.8 (cho FastAPI server)
-- FastAPI, Groq API key
+- Ket noi Internet
 
-## Cài đặt
+## Cai dat
 
-### 1. Flutter Setup
+### 1. Cau hinh moi truong
+
+Tao file `.env` trong root project (hoac copy tu `.env.example`) va dien thong tin Supabase:
+
+```env
+HF_ANALYZE_ENDPOINT=https://minh-4t-english-analyze.hf.space/analyze-image
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_BUCKET=btl
+SUPABASE_TABLE=flashcards
+```
+
+### 2. Cai dependencies va chay app
 
 ```bash
-# Cài đặt dependencies
 flutter pub get
-
-# Build APK
-flutter build apk
-
-# Hoặc chạy trực tiếp
 flutter run
 ```
 
-### 2. FastAPI Server Setup
+## API endpoint dang su dung
 
-```bash
-# Cài đặt dependencies Python
-pip install fastapi uvicorn groq pillow python-multipart
+Endpoint phan tich anh duoc doc tu bien `HF_ANALYZE_ENDPOINT` trong file `.env`.
 
-# Chạy server (Windows)
-python FastAPI.py
+## Kien truc hien tai
 
-# Hoặc sử dụng uvicorn trực tiếp
-uvicorn FastAPI:app --host 0.0.0.0 --port 8000
-```
-
-### 3. Cấu hình API connection
-
-**Trong `lib/main.dart` (dòng ~180):**
-
-```dart
-const String apiUrl = 'http://10.0.2.2:8000/analyze-image';  // Android Emulator
-// hoặc
-const String apiUrl = 'http://YOUR_COMPUTER_IP:8000/analyze-image';  // Physical device
-```
-
-**Ghi chú:**
-
-- `10.0.2.2` là địa chỉ host khi chạy trên Android Emulator
-- Với physical device, thay `YOUR_COMPUTER_IP` bằng IP của máy tính chạy FastAPI
-- Ví dụ: `http://192.168.1.100:8000/analyze-image`
-
-### 4. Groq API Key
-
-Trong `FastAPI.py` (dòng ~11), thay API key của bạn:
-
-```python
-client = Groq(api_key="gsk_YOUR_API_KEY_HERE")
-```
-
-Lấy API key tại: https://console.groq.com
-
-## Tính năng
-
-### Chụp ảnh
-
-- **Chụp ảnh**: Sử dụng camera thiết bị
-- **Chọn từ thư viện**: Chọn ảnh từ gallery
-
-### Xử lý ảnh
-
-- Resize tự động về 640x640 pixel (hoặc 800x800)
-- Nén chất lượng 85% để tối ưu tốc độ truyền tải
-- Hỗ trợ định dạng JPEG
-
-### Phân tích AI
-
-- Sử dụng Llama 3.2 11B Vision từ Groq
-- Nhượ diện đồ vật chính trong ảnh
-- Trích xuất thông tin tương ứng
-
-### Hiển thị kết quả
-
-- Ảnh gốc đã được xử lý
-- Từ tiếng Anh chính
-- Phiên âm IPA
-- Tính năng phát âm (TTS)
-- Nghĩa tiếng Việt
-- Loại từ (noun, verb, etc.)
-- Câu ví dụ
-- Hướng dẫn phát âm chi tiết
-
-## Kiến trúc
-
-```
-┌─────────────────────┐
-│   Flutter App       │
-│  (main.dart)        │
-└──────────┬──────────┘
-           │ HTTP POST (MultipartForm)
-           │ Image (640x640, JPEG)
-           ▼
-┌─────────────────────┐
-│   FastAPI Server    │
-│  (FastAPI.py)       │
-│  - Image resize     │
-│  - Groq API call    │
-│  - JSON response    │
-└──────────┬──────────┘
-           │ JSON Response
-           │ {word, phonetic, vietnamese_meaning, ...}
-           ▼
-┌─────────────────────┐
-│   Groq LLM          │
-│  (Llama 3.2 Vision) │
-└─────────────────────┘
-```
-
-## API Endpoint
-
-### POST `/analyze-image`
-
-**Request:**
-
-```
-Content-Type: multipart/form-data
-Body: file (image/jpeg)
-```
-
-**Response (200 OK):**
-
-```json
-{
-  "status": "success",
-  "data": {
-    "word": "cat",
-    "phonetic": "/kæt/",
-    "vietnamese_meaning": "con mèo",
-    "example_sentence": "I have a cute cat at home.",
-    "pronunciation_guide": "Phát âm 'kæt' - độc âm 'k' + 'æ' (như trong 'bad') + 't'",
-    "word_type": "noun"
-  },
-  "message": "Image analysis completed successfully"
-}
+```text
+Flutter App
+  -> HTTP POST (multipart image)
+Hugging Face Space API
+  -> JSON ket qua nhan dien
+Flutter App
+  -> hien thi ket qua + luu Supabase
 ```
 
 ## Permissions (Android)
 
-Đã được cấu hình trong `android/app/src/main/AndroidManifest.xml`:
+Da duoc cau hinh trong `android/app/src/main/AndroidManifest.xml`:
 
-- `CAMERA`: Truy cập camera
-- `READ_EXTERNAL_STORAGE`: Đọc gallery
-- `WRITE_EXTERNAL_STORAGE`: Lưu ảnh tạm
-- `INTERNET`: Kết nối API
+- `CAMERA`: Truy cap camera
+- `READ_EXTERNAL_STORAGE`: Doc gallery
+- `WRITE_EXTERNAL_STORAGE`: Luu anh tam
+- `INTERNET`: Goi API
 
 ## Troubleshooting
 
-### Lỗi "Connection refused"
+### Loi khong goi duoc API
 
-- Kiểm tra FastAPI server đang chạy
-- Kiểm tra IP và port trong `main.dart`
-- Đảm bảo device và máy tính trong cùng WiFi network
+- Kiem tra endpoint Hugging Face co hoat dong
+- Kiem tra ket noi Internet
+- Thu lai voi anh nhe hon
 
-### Lỗi "Permission denied" (Camera)
+### Loi Supabase
 
-- Cấp quyền camera trong settings Android
-- Ứng dụng yêu cầu permission khi chạy lần đầu
+- Kiem tra gia tri trong `.env`
+- Kiem tra bucket/table da ton tai va dung ten
 
-### Lỗi "Invalid JSON response"
+## Cau truc du an
 
-- Kiểm tra Groq API key có hiệu lực
-- Kiểm tra internet connection
-
-### Tốc độ chậm
-
-- Giảm kích thước ảnh trong `main.dart`
-- Tăng quality/speed của Groq model
-
-## Cấu trúc dự án
-
-```
-app_btl/
-├── lib/
-│   └── main.dart          # Flutter UI & logic
-├── android/
-│   └── app/src/main/
-│       └── AndroidManifest.xml
-├── ios/                    # iOS platform
-├── FastAPI.py              # Backend server
-├── pubspec.yaml            # Flutter dependencies
-└── README.md               # This file
+```text
+Cardify/
+|- lib/
+|- android/
+|- ios/
+|- web/
+|- .env.example
+|- pubspec.yaml
+|- README.md
 ```
 
-## Dependencies
+## Dependencies chinh (Flutter)
 
-**Flutter:**
-
-- `image_picker`: Chụp/chọn ảnh
-- `image`: Resize ảnh
-- `http`: HTTP requests
-- `flutter_tts`: Text-to-Speech
-
-**Python:**
-
-- `fastapi`: Web framework
-- `uvicorn`: ASGI server
-- `groq`: Groq API client
-- `pillow`: Image processing
-
-## Phát triển tiếp theo
-
-- [ ] Thêm history/bookmark từ vựng
-- [ ] Lưu từ vựng vào local database
-- [ ] Thêm quiz/practice mode
-- [ ] Hỗ trợ nhiều ngôn ngữ khác
-- [ ] Thêm pronunciation practice recorder
-- [ ] Offline mode với cached data
-
-## Liên hệ & Support
-
-Nếu có vấn đề hoặc góp ý, vui lòng tạo issue hoặc liên hệ.
+- `camera`
+- `image_picker`
+- `http`
+- `flutter_tts`
+- `supabase_flutter`
+- `flutter_dotenv`
 
 ## License
 

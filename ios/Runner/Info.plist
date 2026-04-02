@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ung dung can microphone de nguoi dung noi chuyen voi AI.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Ung dung can nhan dien giong noi de chuyen loi noi thanh van ban.</string>
 </dict>
 </plist>

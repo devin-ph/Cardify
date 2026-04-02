@@ -1,4 +1,5 @@
 class AnalysisResult {
+  final String topic;
   final String word;
   final String phonetic;
   final String vietnameseMeaning;
@@ -7,6 +8,7 @@ class AnalysisResult {
   final String pronunciationGuide;
 
   AnalysisResult({
+    required this.topic,
     required this.word,
     required this.phonetic,
     required this.vietnameseMeaning,
@@ -17,6 +19,7 @@ class AnalysisResult {
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
     return AnalysisResult(
+      topic: json['topic'] ?? json['category'] ?? 'General',
       word: json['word'] ?? '',
       phonetic: json['phonetic'] ?? '',
       vietnameseMeaning: json['vietnamese_meaning'] ?? '',
@@ -25,4 +28,6 @@ class AnalysisResult {
       pronunciationGuide: json['pronunciation_guide'] ?? '',
     );
   }
+
+  String get normalizedWord => word.trim().toLowerCase();
 }
