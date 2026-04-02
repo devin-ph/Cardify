@@ -47,3 +47,10 @@ app.*.map.json
 .env
 .dart_tool/
 build/
+# Bỏ qua các thư mục build và cache
+build/
+android/.gradle/
+.dart_tool/
+
+# Bỏ qua các file tự sinh của plugin
+*GeneratedPluginRegistrant*
