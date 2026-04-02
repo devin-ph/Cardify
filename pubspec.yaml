@@ -46,6 +46,7 @@ dependencies:
   flutter_tts: ^4.2.5
   flip_card: ^0.7.0
   intl: ^0.20.2
+  firebase_auth: ^6.3.0
 
 dev_dependencies:
   flutter_test:

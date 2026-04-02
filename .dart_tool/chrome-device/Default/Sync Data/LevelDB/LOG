@@ -1,3 +1,8 @@
-2026/04/02-23:09:11.828 210f4 Reusing MANIFEST C:\Users\Acer\AppData\Local\Temp\flutter_tools.c861a0be\flutter_tools_chrome_device.38c0505f\Default\Sync Data\LevelDB/MANIFEST-000001
-2026/04/02-23:09:11.829 210f4 Recovering log #3
-2026/04/02-23:09:11.829 210f4 Reusing old log C:\Users\Acer\AppData\Local\Temp\flutter_tools.c861a0be\flutter_tools_chrome_device.38c0505f\Default\Sync Data\LevelDB/000003.log 
+2026/04/03-00:12:15.761 1c2c8 Reusing MANIFEST C:\Users\Acer\AppData\Local\Temp\flutter_tools.d70cf531\flutter_tools_chrome_device.a76973e1\Default\Sync Data\LevelDB/MANIFEST-000001
+2026/04/03-00:12:15.762 1c2c8 Recovering log #3
+2026/04/03-00:12:15.762 1c2c8 Level-0 table #3: started
+2026/04/03-00:12:15.765 1c2c8 Level-0 table #3: 178 bytes OK
+2026/04/03-00:12:15.765 1c2c8 Recovering log #4
+2026/04/03-00:12:15.765 1c2c8 Reusing old log C:\Users\Acer\AppData\Local\Temp\flutter_tools.d70cf531\flutter_tools_chrome_device.a76973e1\Default\Sync Data\LevelDB/000004.log 
+2026/04/03-00:12:15.767 1c2c8 Delete type=0 #3
+2026/04/03-00:12:15.767 1c2c8 Delete type=2 #5
