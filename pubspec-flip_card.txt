@@ -1,2 +1,0 @@
-# Add this to your pubspec.yaml under dependencies:
-flip_card: ^0.7.0
