@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'flashcard_category_screen.dart';
 
 class DeckListScreen extends StatefulWidget {
+  const DeckListScreen({super.key});
+
   @override
   State<DeckListScreen> createState() => _DeckListScreenState();
 }
@@ -49,9 +51,12 @@ class _DeckListScreenState extends State<DeckListScreen> {
   Widget build(BuildContext context) {
     // Lọc deck theo search và filter
     List<Map<String, dynamic>> filteredDecks = decks.where((deck) {
-      if (filterIndex == 1 && deck['progress'] == 0) return false; // Recent: ví dụ chỉ lấy deck có tiến độ
+      if (filterIndex == 1 && deck['progress'] == 0)
+        return false; // Recent: ví dụ chỉ lấy deck có tiến độ
       if (filterIndex == 2 && !deck['favorite']) return false; // Favorites
-      if (search.isNotEmpty && !deck['title'].toLowerCase().contains(search.toLowerCase())) return false;
+      if (search.isNotEmpty &&
+          !deck['title'].toLowerCase().contains(search.toLowerCase()))
+        return false;
       return true;
     }).toList();
 
@@ -66,7 +71,10 @@ class _DeckListScreenState extends State<DeckListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  Text('Study Decks', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Study Decks',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
                   Spacer(),
                   // Avatar nếu muốn
                   // CircleAvatar(...)
@@ -82,7 +90,10 @@ class _DeckListScreenState extends State<DeckListScreen> {
                   prefixIcon: Icon(Icons.search),
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 0,
+                    horizontal: 16,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -171,20 +182,42 @@ class _DeckListScreenState extends State<DeckListScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(deck['title'], style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text(deck['desc'], style: TextStyle(fontSize: 14, color: Colors.black54)),
+                      Text(
+                        deck['title'],
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        deck['desc'],
+                        style: TextStyle(fontSize: 14, color: Colors.black54),
+                      ),
                     ],
                   ),
                 ),
-                Icon(deck['favorite'] ? Icons.star : Icons.star_border, color: Color(0xFF0A5DB6)),
+                Icon(
+                  deck['favorite'] ? Icons.star : Icons.star_border,
+                  color: Color(0xFF0A5DB6),
+                ),
               ],
             ),
             SizedBox(height: 12),
             Row(
               children: [
-                Text('${deck['cards']} cards mastered', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                Text(
+                  '${deck['cards']} cards mastered',
+                  style: TextStyle(fontSize: 13, color: Colors.black87),
+                ),
                 Spacer(),
-                Text('${(deck['progress'] * 100).toInt()}%', style: TextStyle(fontSize: 13, color: Color(0xFF0A5DB6), fontWeight: FontWeight.bold)),
+                Text(
+                  '${(deck['progress'] * 100).toInt()}%',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF0A5DB6),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             SizedBox(height: 6),
@@ -201,7 +234,9 @@ class _DeckListScreenState extends State<DeckListScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(0xFF0A5DB6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   padding: EdgeInsets.symmetric(vertical: 12),
                 ),
                 onPressed: () {
@@ -213,7 +248,13 @@ class _DeckListScreenState extends State<DeckListScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Practice', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Practice',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     SizedBox(width: 8),
                     Icon(Icons.arrow_forward, size: 20),
                   ],

@@ -5,10 +5,10 @@ class ProfileScreen extends StatefulWidget {
   final String name;
   final String email;
   const ProfileScreen({
-    Key? key,
+    super.key,
     this.name = 'Người dùng',
     this.email = 'user@email.com',
-  }) : super(key: key);
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -31,15 +31,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isDarkMode = !isDarkMode;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(isDarkMode ? 'Đã chuyển sang Dark Mode' : 'Đã chuyển sang Light Mode')),
+      SnackBar(
+        content: Text(
+          isDarkMode ? 'Đã chuyển sang Dark Mode' : 'Đã chuyển sang Light Mode',
+        ),
+      ),
     );
   }
 
   void _logout() {
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('')));
   }
 
   Future<void> _editProfile() async {
@@ -76,9 +80,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Icon(Icons.person, size: 54, color: Colors.white),
             ),
             const SizedBox(height: 24),
-            Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(
+              name,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Text(email, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(
+              email,
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: _editProfile,
@@ -94,9 +104,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ElevatedButton.icon(
               onPressed: _toggleTheme,
               icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
-              label: Text(isDarkMode ? 'Chuyển sang Light Mode' : 'Chuyển sang Dark Mode'),
+              label: Text(
+                isDarkMode ? 'Chuyển sang Light Mode' : 'Chuyển sang Dark Mode',
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDarkMode ? Colors.grey[800] : Colors.blue[400],
+                backgroundColor: isDarkMode
+                    ? Colors.grey[800]
+                    : Colors.blue[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 48),
               ),

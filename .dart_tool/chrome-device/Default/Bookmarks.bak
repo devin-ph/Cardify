@@ -1,5 +1,5 @@
 {
-   "checksum": "16c2e39c792ec1137f8208238e6adcfe",
+   "checksum": "4ae0c147bcf63a844f006a94c9de29f6",
    "roots": {
       "bookmark_bar": {
          "children": [ {
@@ -9,33 +9,24 @@
                "guid": "976d920c-f792-41c4-b228-6badff44ed56",
                "id": "13",
                "name": "Dell Auction",
-               "show_icon": false,
-               "source": "import_fre",
                "type": "url",
-               "url": "http://www.dellauction.com/",
-               "visit_count": 0
+               "url": "http://www.dellauction.com/"
             }, {
                "date_added": "13340648269417465",
                "date_last_used": "0",
                "guid": "ceeb12a7-6aa4-4485-bdd0-8e68dd87f585",
                "id": "14",
                "name": "Dell",
-               "show_icon": false,
-               "source": "import_fre",
                "type": "url",
-               "url": "http://www.dell.com/",
-               "visit_count": 0
+               "url": "http://www.dell.com/"
             }, {
                "date_added": "13340648269433092",
                "date_last_used": "0",
                "guid": "70edaaf4-00ca-4d57-92b8-1291a47c8fa2",
                "id": "15",
                "name": "Support.Dell.Com",
-               "show_icon": false,
-               "source": "import_fre",
                "type": "url",
-               "url": "http://www.dell.com/support/home",
-               "visit_count": 0
+               "url": "http://www.dell.com/support/home"
             } ],
             "date_added": "13419007836229206",
             "date_last_used": "0",
@@ -43,7 +34,6 @@
             "guid": "ba160c55-8e7b-4883-a39a-ebda7d492e87",
             "id": "12",
             "name": "Dell",
-            "source": "unknown",
             "type": "folder"
          }, {
             "date_added": "13356066681063927",
@@ -54,96 +44,71 @@
                "power_bookmark_meta": ""
             },
             "name": "Home | Microsoft 365",
-            "show_icon": false,
-            "source": "sync",
             "type": "url",
-            "url": "https://www.office.com/?auth=2",
-            "visit_count": 2
+            "url": "https://www.office.com/?auth=2"
          }, {
             "date_added": "13410369369460841",
             "date_last_used": "13418358803854571",
             "guid": "a800ca57-de8f-4dc7-a320-42a381629eb7",
             "id": "17",
             "name": "RAG Chatbot For Medical QA | Llama",
-            "show_icon": false,
-            "source": "sync",
             "type": "url",
-            "url": "https://www.kaggle.com/code/manarsaber/rag-chatbot-for-medical-qa-llama",
-            "visit_count": 2
+            "url": "https://www.kaggle.com/code/manarsaber/rag-chatbot-for-medical-qa-llama"
          }, {
             "date_added": "13411066826896590",
             "date_last_used": "13411363763428862",
             "guid": "d360dd0a-7ac0-4d26-8c7d-6d00cfee8194",
             "id": "18",
             "name": "notebook20e2b74245 | Kaggle",
-            "show_icon": false,
-            "source": "sync",
             "type": "url",
-            "url": "https://www.kaggle.com/code/ltinminh453453/notebook20e2b74245/edit",
-            "visit_count": 3
+            "url": "https://www.kaggle.com/code/ltinminh453453/notebook20e2b74245/edit"
          }, {
             "date_added": "13411815986373403",
             "date_last_used": "0",
             "guid": "ab1b4cdb-95be-4146-9a8b-73373d49fa53",
             "id": "19",
             "name": "e",
-            "show_icon": false,
-            "source": "sync",
             "type": "url",
-            "url": "https://docs.google.com/document/d/19Py4Wro0Nzp9xdHLPQ8i63YmfQLoxKNyLZ5YGN70rUs/edit?tab=t.0#heading=h.vpl9qygsw4jr",
-            "visit_count": 1
+            "url": "https://docs.google.com/document/d/19Py4Wro0Nzp9xdHLPQ8i63YmfQLoxKNyLZ5YGN70rUs/edit?tab=t.0#heading=h.vpl9qygsw4jr"
          }, {
             "date_added": "13416478500176363",
             "date_last_used": "0",
             "guid": "3463cf76-b6f6-44e8-b854-59d01fe3b8d7",
             "id": "20",
             "name": "11.14. Adam — Đắm mình vào Học Sâu 0.14.4 documentation",
-            "show_icon": false,
-            "source": "sync",
             "type": "url",
-            "url": "https://d2l.aivivn.com/chapter_optimization/adam_vn.html",
-            "visit_count": 1
+            "url": "https://d2l.aivivn.com/chapter_optimization/adam_vn.html"
          }, {
             "date_added": "13419009364819024",
             "date_last_used": "0",
             "guid": "1b025eae-fa48-40d3-b80d-d7d30ef30a96",
             "id": "26",
             "name": "McAfee Security",
-            "show_icon": false,
-            "source": "oem_preload",
             "type": "url",
-            "url": "https://www.mcafee.com/consumer/v/browserfav/dell.html",
-            "visit_count": 0
+            "url": "https://www.mcafee.com/consumer/v/browserfav/dell.html"
          }, {
             "date_added": "13419008180173776",
             "date_last_used": "0",
             "guid": "0e558987-e034-4072-a53e-c601d2c137b6",
             "id": "24",
             "name": "McAfee Security",
-            "show_icon": false,
-            "source": "oem_preload",
             "type": "url",
-            "url": "https://www.mcafee.com/consumer/v/browserfav/dell.html",
-            "visit_count": 0
+            "url": "https://www.mcafee.com/consumer/v/browserfav/dell.html"
          }, {
             "date_added": "13419007830621084",
             "date_last_used": "0",
             "guid": "caffc5d4-e82e-4dae-9cf9-c4585d2e95dc",
             "id": "7",
             "name": "McAfee Security",
-            "show_icon": false,
-            "source": "oem_preload",
             "type": "url",
-            "url": "https://www.mcafee.com/consumer/v/browserfav/dell.html",
-            "visit_count": 0
+            "url": "https://www.mcafee.com/consumer/v/browserfav/dell.html"
          } ],
          "date_added": "13419007830223764",
          "date_last_used": "0",
          "date_modified": "13419009374038024",
          "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
          "id": "1",
-         "name": "Favorites bar",
-         "source": "unknown",
+         "name": "Bookmarks bar",
          "type": "folder"
       },
       "other": {
@@ -156,30 +121,23 @@
                "power_bookmark_meta": ""
             },
             "name": "NV2_ProductBacklog_Template 1.docx",
-            "show_icon": false,
-            "source": "sync",
             "type": "url",
-            "url": "https://onedrive.live.com/personal/ae066fbba19a5f25/_layouts/15/Doc.aspx?sourcedoc=%7Bacfdfb48-ade2-45a1-b291-7f4b31a2b75f%7D&action=default&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3cvYy9hZTA2NmZiYmExOWE1ZjI1L0VVajdfYXppcmFGRnNwRl9TekdpdDE4QlNnTVdocGR3cjlqdEVDbUZha0kteFE_ZT1Yd01MU3k&slrid=23426aa1-b0f7-7000-2f6f-1dbc4991fe89&originalPath=aHR0cHM6Ly8xZHJ2Lm1zL3cvYy9hZTA2NmZiYmExOWE1ZjI1L0VVajdfYXppcmFGRnNwRl9TekdpdDE4QlNnTVdocGR3cjlqdEVDbUZha0kteFE_cnRpbWU9QlhnU2Vtc1UzVWc&CID=f4c532c8-73ec-43b7-9666-d16b333cd743&_SRM=0:G:152",
-            "visit_count": 1
+            "url": "https://onedrive.live.com/personal/ae066fbba19a5f25/_layouts/15/Doc.aspx?sourcedoc=%7Bacfdfb48-ade2-45a1-b291-7f4b31a2b75f%7D&action=default&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3cvYy9hZTA2NmZiYmExOWE1ZjI1L0VVajdfYXppcmFGRnNwRl9TekdpdDE4QlNnTVdocGR3cjlqdEVDbUZha0kteFE_ZT1Yd01MU3k&slrid=23426aa1-b0f7-7000-2f6f-1dbc4991fe89&originalPath=aHR0cHM6Ly8xZHJ2Lm1zL3cvYy9hZTA2NmZiYmExOWE1ZjI1L0VVajdfYXppcmFGRnNwRl9TekdpdDE4QlNnTVdocGR3cjlqdEVDbUZha0kteFE_cnRpbWU9QlhnU2Vtc1UzVWc&CID=f4c532c8-73ec-43b7-9666-d16b333cd743&_SRM=0:G:152"
          }, {
             "date_added": "13399481182637602",
             "date_last_used": "0",
             "guid": "02d6bc7f-507b-40be-8d8a-001f99acf446",
             "id": "22",
             "name": "Home - Studocu",
-            "show_icon": false,
-            "source": "sync",
             "type": "url",
-            "url": "https://www.studocu.com/vn/home",
-            "visit_count": 1
+            "url": "https://www.studocu.com/vn/home"
          } ],
          "date_added": "13419007830223764",
          "date_last_used": "0",
          "date_modified": "13399481182637602",
          "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
          "id": "2",
-         "name": "Other favorites",
-         "source": "unknown",
+         "name": "Other bookmarks",
          "type": "folder"
       },
       "synced": {
@@ -189,22 +147,10 @@
          "date_modified": "0",
          "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
          "id": "3",
-         "name": "Mobile favorites",
-         "source": "unknown",
-         "type": "folder"
-      },
-      "workspaces_v2": {
-         "children": [  ],
-         "date_added": "13419007830223764",
-         "date_last_used": "0",
-         "date_modified": "0",
-         "guid": "75aa6670-344f-549d-b742-660f029506ab",
-         "id": "5",
-         "name": "Workspaces",
-         "source": "unknown",
+         "name": "Mobile bookmarks",
          "type": "folder"
       }
    },
-   "sync_metadata": "CjEKDgiIgQISCL06zAOdAQAAEgAqGGxKNnhOdS9WdVRoMXhRK1IzRi9iWVE9PUgDoAYHEo4BCAMSiQEKHG5qZ0R1ODhlQ3J2WHA4NnBEN2ZIR2NxRnA4OD0SJDExMWMxNjBmLTQwNzEtNWMzZC1hNmNjLTdlZWI3NzVkYmE0ORgAIAAoADDLjeO8sTE4oJLjvLExQKCS47yxMUoceXpOQjAxY241NEE3Y1JVMHVUKy9QZ21UdFVvPVoAZQAAAADCPgJgABKOAQgFEokBChx3UkJyWkwrNlBBOWF2S2dqTlA3SlhETGNmdnM9EiQyZDkxZGI2ZS1kMTk3LTU5ZTktOGE1Ni02NmRiNjFjZmY1ZmEYACAAKAAwpM/C56UzONjQwuelM0DY0MLnpTNKHG5teDY1c1FEdnhJOFRnRWV2K0ErbnR0b1NuND1aAGUAAAAAwj4CYAASrQEIFhKoAQocR3VFYkQ3V040Y3Fkb2ZCUDlNQUxEV2QwZk5jPRIkMDJkNmJjN2YtNTA3Yi00MGJlLThkOGEtMDAxZjk5YWNmNDQ2GAAgACgAMMes6vSJMziSsOr0iTNAkrDq9IkzShxlZGRQY2tqQVdRWlRIN1NucjUzY0lhQnRHY0E9Wh8iHbk1UDRIckUzNzZZOWNHQ1E3cjlvRklSMkVUbHM9ZWG5eWfCPgJgBRKsAQgVEqcBChwxb0lpS1Zzc3JiSG1wcnZURURqaXBZSWhZbTg9EiRkNDI3ZWJmYi01NDdmLTRjYmMtYTU1NS05MDgwMjI4Njk3ZjcYACAAKAAwyZfXj7kyOJzd1o+5MkCc3daPuTJKHG9UMmZCbzVDb2JpdUhnZVpTU2FURUdKT0c2ND1aHiIcckY0MTBlQm5sVFZwcFR4T1R2VFVaRFQwMk80PWXBy6XKwj4CYAUSjgEIAhKJAQocWWNTVG9udkVTUHdxQ3M0TDJjclZodjY4TDk4PRIkY2NmZTFkZGMtZWI3Yi01MzM4LTgzZDQtYTQ3YTg0MTk5NGMxGAAgACgAMMaN47yxMTjYkeO8sTFA2JHjvLExShxvUFZraHdCUmJWNjVLQ1dSMitJT05IV29PdTg9WgBlAAAAAMI+AmAAEqwBCAwSpwEKHGhwL1lMM0NkR2k2SXp4QmxKYjRVbkQzU2tUbz0SJGJhMTYwYzU1LThlN2ItNDg4My1hMzlhLWViZGE3ZDQ5MmU4NxgAIAAoADCE7uO8sTE4j/PjvLExQI/z47yxMUocRmtVM0lWYlR6OXRsVGNiemhRNUlKRG9tZllZPVoeIhwyM1BmK29uNFM2VkJyMGtsUGF2emY0c1BrVm89ZQAAAADCPgJgABKtAQgUEqgBChxDZlVnOW5pZzhhV1BOdW9YMU5PSityOUVObEk9EiQzNDYzY2Y3Ni1iNmY2LTQ0ZTgtYjg1NC01OWQwMWZlM2I4ZDcYACAAKAAw+tet9MozONSR5J3JM0DUkeSdyTNKHEpsOW52aGp2MGNvZWFmeWRRZ1FLWXQrT2lEND1aHyId7zloQkZyZXdmUjZBWlZFM3hDL1RQRjlLYit3MD1l1FNCaMI+AmAFEq0BCBMSqAEKHEF6cTFucDhtUVZXWVN2ZEZaZVRENFlvMi93cz0SJGFiMWI0Y2RiLTk1YmUtNDE0Ni05YThiLTczMzczZDQ5ZmE1MxgAIAAoADCD/8LutzM4z47D7rczQM+Ow+63M0ocNVdiZUtFR1pPNEdNRUNKR3kvNkMzb25hNFUwPVofIh3eU05remRnYTA2MU11cjMvbVg2Ni9vdEsrQURBPWU4SPMbwj4CYAUSrQEIEhKoAQocQ1Q2ZUJsbFlKUitmY3lBTS9ZMXhDRm14blM4PRIkZDM2MGRkMGEtN2FjMC00ZDI2LThjN2QtNmQwMGNmZWU4MTk0GAAgACgAMI7X8Za2Mzjz56WJtTNA8+elibUzShxjRkpxZ3Jsek1zdzMzZFNZSmpybDNYbnhGbEE9Wh8iHbxmMTMwa28vaGlISG53T0xiR3BGSEZxd3YrUlk9ZTCTe5/CPgJgBRKOAQgBEokBChx5eEovNmZ2a2VjcjdrcDVFUXpCNHRXTHBkYkU9EiQzZDc5YmQwZC1mNGMyLTU1OWYtYjNmMS0zNTMwNzhlNzEwMDYYACAAKAAwxY3jvLExOLOR47yxMUCzkeO8sTFKHGFSQ1dMZ2hGOWI1SW5xS0lEdnVKL2p2UWtGYz1aAGUAAAAAwj4CYAASrAEIDRKnAQocdk1DeW9oMkxQcHl1MS9FWXdxZGc1ZnRrZk53PRIkOTc2ZDkyMGMtZjc5Mi00MWM0LWIyMjgtNmJhZGZmNDRlZDU2GAAgACgAMIXu47yxMTin8+O8sTFAp/PjvLExShxxZVpJRXRKclFpdXZYMldFdzQ2MFRuMG50OW89Wh4iHDRLcjhlUnk2ckxIZ1hGakJlV3dEaFA0RjgyQT1lAAAAAMI+AmACEqwBCBASpwEKHGNEdVRLVFlXenNBZG5PTXVxUCtMWkpNdUxwZz0SJDY2MjllMDQ3LWZkOTgtNDZjNy04OGFiLTg0MTRjMjQyNGVkMBgAIAAoADDMhfzwpjM4/LmXl+gxQPy5l5foMUocRklKcGJaYk9Zck5tVEZ0ejFlcFB0WmJQVVR3PVoeIhxXTFNUSVBwKzQ1S2dSWWVOZXFxMnlhcllqU1U9Zft7orLCPgJgBRKsAQgPEqcBChxTSlcyK1lJdXRXS0lMbkN0b24vL1R0cGFJV2c9EiQ3MGVkYWFmNC0wMGNhLTRkNTctOTJiOC0xMjkxYTQ3YzhmYTIYACAAKAAwh+7jvLExONfz47yxMUDX8+O8sTFKHFVITmNCS3haUkEwMGw4OU53NEZCSWxQSFF4cz1aHiIcelRuNFozb0FhQkxJK04vSkpQamFoTjNPUUFjPWUAAAAAwj4CYAISrAEIDhKnAQocTnlGSDlCdU1KRGdxMWFRZ3Z1ZE9FcjFoMmg0PRIkY2VlYjEyYTctNmFhNC00NDg1LWJkZDAtOGU2OGRkODdmNTg1GAAgACgAMIbu47yxMTi/8+O8sTFAv/PjvLExShw5SmU0ektncTJ6QXBLamJ1SVNLb1ZBeVBVUzg9Wh4iHENNQUdDdFVGZ2F1M1Q1bVpIa21RQ0RQM3p1Zz1lAAAAAMI+AmACEqwBCBESpwEKHEVyVHZFSHlDOWZJYTdIcnNZcUNaOHNNSlRqbz0SJGE4MDBjYTU3LWRlOGYtNGRjNy1hMzIwLTQyYTM4MTYyOWViNxgAIAAoADC89bCe0DM4m7zcvLIzQJu83LyyM0ocNkkxQTdkSk5Pa1hUNUhDSGhGRTZGSi9iTUIwPVoeIhx4Z3R3aE1tUkNPeTNIMkdoNjJRKy9MVWxUTkk9ZTCTe5/CPgJgBTAAOAA=",
+   "sync_metadata": "CqgBCocBCIiBAhKAASAAkgFsCmoKDmNocm9tZV9zeW5jX2JtEgU1MSFibRoSCa/FSiBpTgYAEa/FSiBpTgYAIjQJbxo0IGlOBgAQAxk9UP9xI0mwzCABKhw1MSFibS9mZDo5MTYzNzIzNTU5NDY4ODkzMTYxKUhNSyBpTgYA6gEMCPChtc4GELi374kCEgAqGC9wTzJmRjZrelRmL3JDbVNReDcvZnc9PUgDEuwBCAcS5wEKHEYrTU1EaVN2UGJER2pJMkY5K2NHVU1KRDIrdz0SZlo6QURxdEFad2ZjOFVDdFY2WkJxWVE4MG1GS0U1RDNsOUFWNk1RVnZIWnoxK0hDSnVSVU4rNGppblNLSmV5eHVkWmRxN1FFT0JIRmFrT3gvRmNTMkZDRzkyMjh2c04vVU1IY2c9PRgAIAEoATDqxr6Cks2TAzi7zpDQ1DNAu86Q0NQzShw2ZFRTMjNDT0RBYW9TRldhUTh2MlVVaUhDVWs9Wh8iHf9uRDlYUWFCdUtBUjZOOEtVY2dKSGErR3J1dzA9ZQAAAAAS7AEIGBLnAQoceUZ3b2wrSDZBYktIbE1Oa00rK0xDNjI5dm4wPRJmWjpBRHF0QVp3ZmM4VUN0VjZaQnFZUTgwbUZLRTVENHFVTU1CVFYvd05oZHp3cDFBczU4a2h1N1MzMUVoeGlCQ1BpSDFEQUZSOXEzcHdnWEJDVFBsME9QTGxmdnZrOEs4aTdsZz09GAAgASgBMOrGvoKSzZMDOLvOkNDUM0C7zpDQ1DNKHHpQZ1JkS09yWjIwSXRhSWtaQmF0RjNlMGdBcz1aHyId/mJuc1NKYXhGeFFHQTA3N3RMbTNJbzZUenhZST1lAAAAABLsAQgSEucBChxDVDZlQmxsWUpSK2ZjeUFNL1kxeENGbXhuUzg9EmZaOkFEcXRBWndmYzhVQ3RWNlpCcVlRODBtRktFNUQ3Y2M1dmxVeGZsNWhBRkh3a256bWUrQlRoaXluSHZkTVZRTWc1d2xhVzNOY1luSDl3WmJreS81YStCcEVzU1FKYW5iM3VnPT0YACACKAIw6sa+gpLNkwM4u86Q0NQzQLvOkNDUM0ocYk9SRjBmdENuSGp3MENXbUhmRU5xbHdOK0dBPVofIh3oZjEzMGtvL2hpSEhud09MYkdwRkhGcXd2K1JZPWUwk3ufEuwBCA8S5wEKHFNKVzIrWUl1dFdLSUxuQ3Rvbi8vVHRwYUlXZz0SZlo6QURxdEFad2ZjOFVDdFY2WkJxWVE4MG1GS0U1RFdPb21PWVBaSldsZnhNS1BBdk1pNlFzY0tRZ0RuNG15SmVML0NMU1RJeDFNMmUzSld6VkFIMGhPWHhzT2hTZGhCUDZHTkE9PRgAIAEoATDqxr6Cks2TAzi6zpDQ1DNAus6Q0NQzShxRVTNxM1kxMjVGRzNFQWJlMDVzQVl2cXlNbEU9Wh8iHbtJOFo1QWlGMFJoQkNEVFg4NjlHYUZrelc5emM9ZQAAAAAS6wEIDhLmAQocTnlGSDlCdU1KRGdxMWFRZ3Z1ZE9FcjFoMmg0PRJmWjpBRHF0QVp3ZmM4VUN0VjZaQnFZUTgwbUZLRTVEQkdsVHpRVC8reXJHOFpDSUZYTW82a0xwdmlSSjZIWTlBWWpqRlozZGNhVkhJenp1VGZYcVhVRU5QeWg5OFFJV1Z3a2ZVUT09GAAgASgBMOrGvoKSzZMDOLrOkNDUM0C6zpDQ1DNKHDBGWm5yTEtwWmhSN1grRE5MQ1NJbjBUdWdnRT1aHiIcd3pWd1NWSTNzU0MrZ2JNdlBaMVpVZ29IMTU0PWUAAAAAEusBCAwS5gEKHGhwL1lMM0NkR2k2SXp4QmxKYjRVbkQzU2tUbz0SZlo6QURxdEFad2ZjOFVDdFY2WkJxWVE4MG1GS0U1RHpmZHkvL1o3VjBVNU1BMHpZakpHNkh3K3hvZlhEMVVUTTVlUnQ2amtsdndRSGRtS2M1TjhGdDAyU3RZRWNHaVg5Z3B4SVE9PRgAIAEoATDqxr6Cks2TAzi6zpDQ1DNAus6Q0NQzShx1bVF1SEpLb0JMS1FBZDNWQ2diQ2VJSGFMZm89Wh4iHEdEenpMUlRBajMrbzFLMDdtN0ZDdkhIN2FVdz1lAAAAABLrAQgVEuYBChwxb0lpS1Zzc3JiSG1wcnZURURqaXBZSWhZbTg9EmZaOkFEcXRBWndmYzhVQ3RWNlpCcVlRODBtRktFNUR1ZkJYRll1OWxGRnBuVFZ3UlV6RTJva0p0cy9uSHo5V21oQ1NyK2p4cWh2RkNDRVlmS0JtTVVnRDladVBYcnVTUDRabUlBPT0YACACKAIw6sa+gpLNkwM4u86Q0NQzQLvOkNDUM0ocbjZJa2djUVFlY3RRYVpnTG9WVWJnaGFMNW5rPVoeIhxyRjQxMGVCbmxUVnBwVHhPVHZUVVpEVDAyTzQ9ZcHLpcoS7AEIERLnAQocRXJUdkVIeUM5ZklhN0hyc1lxQ1o4c01KVGpvPRJmWjpBRHF0QVp3ZmM4VUN0VjZaQnFZUTgwbUZLRTVERmJTdmsrb2oveUx3eG9nZHZnenI3eWFCek1tcWIzTVhBeERLdTlZUTdDNEJVUUFGeHQ2bk96SnppMkUwWEFITnVvb0JHQT09GAAgASgBMOrGvoKSzZMDOLvOkNDUM0C7zpDQ1DNKHFJPUGhrMG4vMUhRSS9LcFdrMzF2bW4xd0t0cz1aHyId0XhndHdoTW1SQ095M0gyR2g2MlErL0xVbFROST1lMJN7nxLsAQgWEucBChxHdUViRDdXTjRjcWRvZkJQOU1BTERXZDBmTmM9EmZaOkFEcXRBWndmYzhVQ3RWNlpCcVlRODBtRktFNURsaXY1MGtWNWVOL1pza1QxRnpkUndSeGdnYjVCRGY0Y2xtWVBhMTVrUmNWNnFFYTNCK1BrTkpqQUtLdHAyQ1dwRE4vR3ZnPT0YACACKAIw6sa+gpLNkwM4u86Q0NQzQLvOkNDUM0ocdzdhSktEbVZEa2dYNFcvRzZRMXc3a3VBa0VvPVofIh25NVA0SHJFMzc2WTljR0NRN3I5b0ZJUjJFVGxzPWVhuXlnEsMBCAISvgEKHFljU1RvbnZFU1B3cUNzNEwyY3JWaHY2OEw5OD0SZlo6QURxdEFaenFSaGtjaW5YOVBFaE1pTDFEa2xrQllxY2FJRDlPM2ZOMGdhakVGSURGZExLbWdBUEpld3dJVU5naWRycTRVd0dSSlJNQ0dZOU9kRFVyNGliWGlYN1c1eGRzQVE9PRgAIAAoADDP7suihqCTAzgAQABKHG9QVmtod0JSYlY2NUtDV1IyK0lPTkhXb091OD1aAGUAAAAAEuwBCBQS5wEKHENmVWc5bmlnOGFXUE51b1gxTk9KK3I5RU5sST0SZlo6QURxdEFad2ZjOFVDdFY2WkJxWVE4MG1GS0U1RGlabzl2bXBsSTI0NVFpWUJUL1M5b09Ka3JLK3phcVAzaUhlRWIwdi9xaG83QlYrakJzOUNBY3hmUlZKQ0dCNUFpUDVsZHc9PRgAIAIoAjDqxr6Cks2TAzi7zpDQ1DNAu86Q0NQzShxIWElzSnhKeFpoalJTa1FhajNoZ3AxbkdHQmM9Wh8iHfo5aEJGcmV3ZlI2QVpWRTN4Qy9UUEY5S2IrdzA9ZdRTQmgS7AEIExLnAQocQXpxMW5wOG1RVldZU3ZkRlplVEQ0WW8yL3dzPRJmWjpBRHF0QVp3ZmM4VUN0VjZaQnFZUTgwbUZLRTVEUGs0Qm5yaFZLMXludDBMRGp4czRabmNnNlVNck9zVEpCdmpwY0Z4bk1jVGx3Q1Q3OWVNeDF3K1RCZGRCZzBmU1hKTUs5dz09GAAgAigCMOrGvoKSzZMDOLvOkNDUM0C7zpDQ1DNKHGZTK0FHTTlKV0JPUGN6Mlk4Z2xJamlXYVJoTT1aHyId9FNOa3pkZ2EwNjFNdXIzL21YNjYvb3RLK0FEQT1lOEjzGxLDAQgDEr4BChxuamdEdTg4ZUNydlhwODZwRDdmSEdjcUZwODg9EmZaOkFEcXRBWnp0OUxOUlZOay9XbHdhNmt5c0hWWHVkcUwyajMyM0ZIQkdIV3ZOcXRBUHJFVktZb0dCNksvVGlmTG1LcDNHaVBiRDllMXR1a3VRUnRWb2wwRVZBYVd0OXNKWmFBPT0YACAAKAAwz+7LooagkwM4AEAAShx5ek5CMDFjbjU0QTdjUlUwdVQrL1BnbVR0VW89WgBlAAAAABLrAQgNEuYBChx2TUN5b2gyTFBweXUxL0VZd3FkZzVmdGtmTnc9EmZaOkFEcXRBWndmYzhVQ3RWNlpCcVlRODBtRktFNURrVTBnaWd5clpWbW4wKzF3dFQyS2paK2NBZ3FablJpNnpLWUQ5dExlcHArdWJrcWtRTzVCSXdyaGlaVHM0RDNPUWtjQjB3PT0YACABKAEw6sa+gpLNkwM4us6Q0NQzQLrOkNDUM0ocRlpDT2J1V1h3SnJQQmFkOXBya0FJTmxTQlpBPVoeIhxZOTFGSkZVR2o4ZHEwUUMwMmdTQkNwTFZGb2c9ZQAAAAAS7AEIEBLnAQocY0R1VEtUWVd6c0Fkbk9NdXFQK0xaSk11THBnPRJmWjpBRHF0QVp3ZmM4VUN0VjZaQnFZUTgwbUZLRTVEcUNvc0k5bkd3dllZeXRjenBCWGN5K0YvbDhKU3JmcDdxckdDWkdLcU9NSFEvMUxRYXA1MnlJNFFxVDc5ZVFqRjZlTmZRQT09GAAgASgBMOrGvoKSzZMDOLrOkNDUM0C6zpDQ1DNKHFhCMjVJcUhQV3R5RUl1U2IwajBwdVNxbXdhUT1aHyIdoy85eUZtTC9yV0RIenJ6anM1WWRaN1hhSU9BST1l+3uishLsAQgaEucBChx2QXlUTkRhZFhwVnlFa2FwOXN6N1RQMDZReWM9EmZaOkFEcXRBWndmYzhVQ3RWNlpCcVlRODBtRktFNURiZHZqcWx6WDJScStkczZiVTFKT215K3pYaWZOTnA3SjBaRE9peTRwTUJrRE9KSGRJbHhQT2RyTkhPZUdWa0lCdmFUMWdBPT0YACABKAEw6sa+gpLNkwM4u86Q0NQzQLvOkNDUM0oceDhZYkY2YmgrSXNKRG8wZlBmaXkvQ3ZHS3ZZPVofIh39RjRVNGxSY1RsejgzWVR6ZXlNR2trVHJEZVNjPWUAAAAAEqsBCAESpgEKHHl4Si82ZnZrZWNyN2twNUVRekI0dFdMcGRiRT0STlo6QURxdEFad3hkcEsyaCthT0Z5U3RzRTBJV1BYU3RWQWJwK1UrYXc5VXhic050YXBYbHkzZ2xDWnVva0dnRFkrcFZQd09XenZLM3VVSRgAIAAoADDP7suihqCTAzgAQABKHGFSQ1dMZ2hGOWI1SW5xS0lEdnVKL2p2UWtGYz1aAGUAAAAAMAE4AA==",
    "version": 1
 }

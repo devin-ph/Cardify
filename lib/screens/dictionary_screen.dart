@@ -4,15 +4,15 @@ import 'dart:ui';
 class DictionaryScreen extends StatelessWidget {
   final List<Map<String, String>> words;
   const DictionaryScreen({
-    Key? key,
-      this.words = const [
+    super.key,
+    this.words = const [
       {
         'image': '',
         'word': 'apple',
         'type': 'noun',
         'meaning': 'quả táo',
         'phonetic': '/ˈæp.əl/',
-        'example': 'I eat an apple every day.'
+        'example': 'I eat an apple every day.',
       },
       {
         'image': '',
@@ -20,7 +20,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'verb',
         'meaning': 'chạy',
         'phonetic': '/rʌn/',
-        'example': 'He can run very fast.'
+        'example': 'He can run very fast.',
       },
       {
         'image': '',
@@ -28,7 +28,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'adj',
         'meaning': 'đẹp',
         'phonetic': '/ˈbjuː.tɪ.fəl/',
-        'example': 'She looked beautiful in that dress.'
+        'example': 'She looked beautiful in that dress.',
       },
       {
         'image': '',
@@ -36,7 +36,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'adv',
         'meaning': 'nhanh chóng',
         'phonetic': '/ˈkwɪk.li/',
-        'example': 'He finished the test quickly.'
+        'example': 'He finished the test quickly.',
       },
       {
         'image': '',
@@ -44,7 +44,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'noun',
         'meaning': 'quyển sách',
         'phonetic': '/bʊk/',
-        'example': 'She borrowed a book from the library.'
+        'example': 'She borrowed a book from the library.',
       },
       {
         'image': '',
@@ -52,7 +52,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'noun',
         'meaning': 'con mèo',
         'phonetic': '/kæt/',
-        'example': 'The cat sat on the mat.'
+        'example': 'The cat sat on the mat.',
       },
       {
         'image': '',
@@ -60,7 +60,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'verb',
         'meaning': 'bơi',
         'phonetic': '/swɪm/',
-        'example': 'I like to swim in the sea.'
+        'example': 'I like to swim in the sea.',
       },
       {
         'image': '',
@@ -68,7 +68,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'adj',
         'meaning': 'nhanh',
         'phonetic': '/kwɪk/',
-        'example': 'Be quick or you\'ll miss the bus.'
+        'example': 'Be quick or you\'ll miss the bus.',
       },
       {
         'image': '',
@@ -76,7 +76,7 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'adv',
         'meaning': 'một cách chậm rãi',
         'phonetic': '/ˈsləʊ.li/',
-        'example': 'He walked slowly to the door.'
+        'example': 'He walked slowly to the door.',
       },
       {
         'image': '',
@@ -84,10 +84,10 @@ class DictionaryScreen extends StatelessWidget {
         'type': 'noun',
         'meaning': 'cây bút',
         'phonetic': '/pen/',
-        'example': 'Please pass me the pen.'
+        'example': 'Please pass me the pen.',
       },
     ],
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -120,36 +120,55 @@ class DictionaryScreen extends StatelessWidget {
                       final maxH = screenH * 0.97;
                       return GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => Navigator.of(context).pop(), // tap outside closes
+                        onTap: () =>
+                            Navigator.of(context).pop(), // tap outside closes
                         child: Material(
                           type: MaterialType.transparency,
                           child: Center(
                             child: GestureDetector(
                               onTap: () {}, // absorb taps inside card
                               child: ConstrainedBox(
-                                constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
+                                constraints: BoxConstraints(
+                                  maxWidth: maxW,
+                                  maxHeight: maxH,
+                                ),
                                 child: Stack(
                                   children: [
                                     Card(
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
                                       child: Padding(
                                         padding: const EdgeInsets.all(20.0),
                                         child: SingleChildScrollView(
                                           child: Column(
                                             mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment: CrossAxisAlignment.center,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
                                             children: [
-                                              if ((word['image'] ?? '').isNotEmpty)
-                                                Image.asset(word['image']!, height: 180, fit: BoxFit.contain)
+                                              if ((word['image'] ?? '')
+                                                  .isNotEmpty)
+                                                Image.asset(
+                                                  word['image']!,
+                                                  height: 180,
+                                                  fit: BoxFit.contain,
+                                                )
                                               else
                                                 Container(
                                                   width: 230,
                                                   height: 230,
                                                   decoration: BoxDecoration(
                                                     color: Colors.blue[50],
-                                                    borderRadius: BorderRadius.circular(16),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
                                                   ),
-                                                  child: const Icon(Icons.image, size: 120, color: Colors.blueGrey),
+                                                  child: const Icon(
+                                                    Icons.image,
+                                                    size: 88,
+                                                    color: Colors.blueGrey,
+                                                  ),
                                                 ),
                                               const SizedBox(height: 22),
                                               Text(word['word'] ?? '', style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold)),
@@ -158,8 +177,38 @@ class DictionaryScreen extends StatelessWidget {
                                               const SizedBox(height: 18),
                                               Text(word['meaning'] ?? '', style: const TextStyle(fontSize: 28)),
                                               const SizedBox(height: 18),
-                                              Text(word['example'] ?? '', style: const TextStyle(fontSize: 20, fontStyle: FontStyle.italic, color: Colors.black87)),
+                                              Text(
+                                                word['word'] ?? '',
+                                                style: const TextStyle(
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                word['phonetic'] ?? '',
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
                                               const SizedBox(height: 14),
+                                              Text(
+                                                word['meaning'] ?? '',
+                                                style: const TextStyle(
+                                                  fontSize: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                word['example'] ?? '',
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontStyle: FontStyle.italic,
+                                                  color: Colors.black87,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 10),
                                             ],
                                           ),
                                         ),
@@ -172,7 +221,8 @@ class DictionaryScreen extends StatelessWidget {
                                         backgroundColor: Colors.white,
                                         child: IconButton(
                                           icon: const Icon(Icons.arrow_back),
-                                          onPressed: () => Navigator.of(context).pop(),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
                                         ),
                                       ),
                                     ),
@@ -185,17 +235,31 @@ class DictionaryScreen extends StatelessWidget {
                       );
                     },
                     transitionBuilder: (context, anim1, anim2, child) {
-                      final curved = CurvedAnimation(parent: anim1, curve: Curves.easeOutBack);
+                      final curved = CurvedAnimation(
+                        parent: anim1,
+                        curve: Curves.easeOutBack,
+                      );
                       return Stack(
                         children: [
                           BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 6 * anim1.value, sigmaY: 6 * anim1.value),
-                            child: Container(color: Colors.black.withOpacity(0)),
+                            filter: ImageFilter.blur(
+                              sigmaX: 6 * anim1.value,
+                              sigmaY: 6 * anim1.value,
+                            ),
+                            child: Container(
+                              color: Colors.black.withOpacity(0),
+                            ),
                           ),
                           Center(
                             child: ScaleTransition(
-                              scale: Tween<double>(begin: 0.75, end: 1.0).animate(curved),
-                              child: FadeTransition(opacity: anim1, child: child),
+                              scale: Tween<double>(
+                                begin: 0.75,
+                                end: 1.0,
+                              ).animate(curved),
+                              child: FadeTransition(
+                                opacity: anim1,
+                                child: child,
+                              ),
                             ),
                           ),
                         ],
@@ -205,7 +269,10 @@ class DictionaryScreen extends StatelessWidget {
                 },
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -227,7 +294,10 @@ class DictionaryScreen extends StatelessWidget {
                           color: Colors.blue[50],
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.image, color: Colors.blueGrey), // Placeholder for image
+                        child: const Icon(
+                          Icons.image,
+                          color: Colors.blueGrey,
+                        ), // Placeholder for image
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -236,22 +306,46 @@ class DictionaryScreen extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Text(word['word'] ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                Text(
+                                  word['word'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.blue[100],
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Text(word['type'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.blue)),
+                                  child: Text(
+                                    word['type'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text(word['meaning'] ?? '', style: const TextStyle(fontSize: 15)),
+                            Text(
+                              word['meaning'] ?? '',
+                              style: const TextStyle(fontSize: 15),
+                            ),
                             const SizedBox(height: 2),
-                            Text(word['phonetic'] ?? '', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                            Text(
+                              word['phonetic'] ?? '',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
+                            ),
                           ],
                         ),
                       ),
