@@ -67,6 +67,13 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  void _onChatTap() {
+    showDialog(
+      context: context,
+      builder: (context) => const AiVoiceChatDialog(),
+    );
+  }
+
   Future<List<String>> _showChatVocabularySaveDialog(
     List<ChatVocabularyCandidate> candidates,
   ) async {
@@ -226,6 +233,11 @@ class _MainScreenState extends State<MainScreen> {
         centerTitle: true,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble),
+            onPressed: _onChatTap,
+            tooltip: 'Chat với AI',
+          ),
           ProfileIcon(onTap: _onProfileTap),
         ],
       ),
