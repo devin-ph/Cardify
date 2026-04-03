@@ -6,63 +6,44 @@
 .pub/
 build/
 
-# Flutter generated files
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/Flutter/.last_build_id
-
-# iOS
-ios/Pods/
-
-# Generated files
-**/GeneratedPluginRegistrant.*
-**/*.g.dart
-
-# Xcode
-DerivedData/
-*.xcuserstate
-*.xcuserdata
-*.xcworkspace
-!ios/Runner.xcworkspace
-
-# Android
-android/.gradle/
-android/local.properties
-android/**/build/
-
-# Gradle
-.gradle/
-
-# IntelliJ / Android Studio
-.idea/
+# IntelliJ / Android Studio related
 *.iml
 *.ipr
 *.iws
+.idea/
+.gradle/
+**/android/.gradle/
+**/android/captures/
+**/android/local.properties
+**/android/generated_plugin_registrant.java
 
-# VS Code
+# VS Code related
 .vscode/
 
-# Python
-__pycache__/
-*.pyc
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+/build/
+**/build/
+/coverage/
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs, temp
-*.log
-*.tmp
-*.swp
-
-# Coverage
-coverage/
-reports/
-
-# Env
+# Key & Env (Bảo mật)
 .env
+*.jks
+*.keystore
+*.google_services.json
 
-# Misc
-*.class
-migrate_working_dir/
-**/ephemeral/
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android Artifacts
+/android/app/debug
+/android/app/profile
+/android/app/release
