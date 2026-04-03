@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "833491715420",
+    "project_id": "cardify-3d313",
+    "storage_bucket": "cardify-3d313.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:833491715420:android:4d950350cbc376d3d7ad99",
+        "android_client_info": {
+          "package_name": "cardify.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "833491715420-qg4kcmvtq5cou5tauj89bkjs0lgniaoq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEnQ6gLqFKxsba1-pN-CaS9WcVtjz_55I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "833491715420-qg4kcmvtq5cou5tauj89bkjs0lgniaoq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

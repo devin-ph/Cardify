@@ -39,12 +39,14 @@ pip install fastapi uvicorn groq pillow python-multipart
 Mở `FastAPI.py` và tìm dòng:
 
 ```python
+
 ```
 
 Thay bằng API key của bạn:
 
 ```python
 client = Groq(api_key="gsk_YOUR_API_KEY_HERE")
+```
 
 ### 2.3 Chạy FastAPI Server
 
@@ -284,3 +286,64 @@ Nếu mọi thứ đúng, bạn sẽ thấy:
 ---
 
 Chúc bạn may mắn! 🚀
+
+## Bước 6: Cấu hình Firebase Authentication (Email/Password + Google)
+
+### 6.1 Tạo Firebase project
+
+1. Vào Firebase Console: https://console.firebase.google.com
+2. Tạo project mới hoặc dùng project có sẵn.
+3. Add app Android với đúng `applicationId` trong `android/app/build.gradle.kts`.
+
+### 6.2 Thêm file cấu hình Firebase vào project
+
+1. Download `google-services.json` từ Firebase Console.
+2. Copy vào đúng vị trí: `android/app/google-services.json`.
+3. Nếu chạy iOS, download `GoogleService-Info.plist` và đặt vào `ios/Runner/GoogleService-Info.plist`.
+
+### 6.3 Bật phương thức đăng nhập trong Firebase
+
+1. Trong Firebase Console, vào Authentication.
+2. Chọn tab Sign-in method.
+3. Bật `Email/Password`.
+4. Bật `Google`.
+5. Nhấn Save.
+
+### 6.4 Cài dependencies và chạy app
+
+```bash
+flutter pub get
+flutter run
+```
+
+Sau khi hoàn tất, tài khoản đăng ký bằng email/password và tài khoản Google sẽ được Firebase Authentication lưu trữ tự động.
+
+### 6.5 Chạy Web (Chrome) với Firebase config
+
+Nếu chạy bằng `flutter run -d chrome`, bạn cần truyền Firebase Web config:
+
+1. Mở Firebase Console -> Project settings -> Your apps -> Web app.
+2. Copy các giá trị trong object `firebaseConfig`.
+3. Tạo file `firebase_web.dev.json` ở thư mục gốc project bằng cách copy từ `firebase_web.template.json`.
+4. Điền đầy đủ các key trong file `firebase_web.dev.json`.
+5. Chạy:
+
+```bash
+flutter run -d chrome --dart-define-from-file=firebase_web.dev.json
+```
+
+Ví dụ file `firebase_web.dev.json`:
+
+```json
+{
+   "FIREBASE_API_KEY": "AIza...",
+   "FIREBASE_APP_ID": "1:1234567890:web:abcd1234",
+   "FIREBASE_MESSAGING_SENDER_ID": "1234567890",
+   "FIREBASE_PROJECT_ID": "your-project-id",
+   "FIREBASE_AUTH_DOMAIN": "your-project-id.firebaseapp.com",
+   "FIREBASE_STORAGE_BUCKET": "your-project-id.firebasestorage.app",
+   "FIREBASE_MEASUREMENT_ID": "G-XXXXXXXXXX"
+}
+```
+
+Lưu ý: 5 key bắt buộc cho Web là `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_AUTH_DOMAIN`.

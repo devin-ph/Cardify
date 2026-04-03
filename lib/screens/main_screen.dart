@@ -11,7 +11,16 @@ import 'achievements_screen.dart';
 enum _ProfileMenuAction { profile, settings, logout }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final String userName;
+  final String userEmail;
+  final Future<void> Function()? onLogout;
+
+  const MainScreen({
+    super.key,
+    required this.userName,
+    required this.userEmail,
+    this.onLogout,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -20,8 +29,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   int _previousIndex = 0;
-  final String _userName = 'Explorer';
-  final String _userEmail = 'explorer.cardify@example.com';
 
   void _setScreenIndex(int index) {
     if (_currentIndex == index) {
@@ -51,11 +58,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onProfileTap() {
-    Navigator.of(
-      context,
-    ).push(
+    Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ProfileScreen(name: _userName, email: _userEmail),
+        builder: (context) =>
+            ProfileScreen(name: widget.userName, email: widget.userEmail),
       ),
     );
   }
@@ -118,8 +124,14 @@ class _MainScreenState extends State<MainScreen> {
               child: const Text('Hủy'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
+                if (widget.onLogout != null) {
+                  await widget.onLogout!();
+                }
+                if (!context.mounted) {
+                  return;
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Đăng xuất thành công.')),
                 );
@@ -138,8 +150,8 @@ class _MainScreenState extends State<MainScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _AnimatedProfileDrawer(
-        userName: _userName,
-        userEmail: _userEmail,
+        userName: widget.userName,
+        userEmail: widget.userEmail,
         onAction: (action) {
           _onProfileMenuSelected(action);
         },
@@ -175,7 +187,7 @@ class _MainScreenState extends State<MainScreen> {
               radius: 20,
               backgroundColor: Colors.white,
               child: Text(
-                _userName.characters.first,
+                widget.userName.characters.first,
                 style: const TextStyle(
                   color: Color(0xFF1F3E92),
                   fontWeight: FontWeight.bold,
@@ -201,7 +213,7 @@ class _MainScreenState extends State<MainScreen> {
     switch (_currentIndex) {
       case 0:
         return HomeScreen(
-          userName: _userName,
+          userName: widget.userName,
           streak: 12,
           level: 5,
           experience: 820,
@@ -289,8 +301,11 @@ class _DrawerNavTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: Colors.white54),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: Colors.white54,
+                ),
               ],
             ),
           ),
@@ -315,7 +330,8 @@ class _AnimatedProfileDrawer extends StatefulWidget {
   State<_AnimatedProfileDrawer> createState() => _AnimatedProfileDrawerState();
 }
 
-class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with SingleTickerProviderStateMixin {
+class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
@@ -327,14 +343,12 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    
-    _slideAnimation = Tween<double>(begin: 300.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-    
+
+    _slideAnimation = Tween<double>(
+      begin: 300.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -361,7 +375,9 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isDestructive ? Colors.red.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+          color: isDestructive
+              ? Colors.red.withOpacity(0.1)
+              : Colors.blue.withOpacity(0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
@@ -408,7 +424,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                   Container(
+                  Container(
                     width: 40,
                     height: 5,
                     decoration: BoxDecoration(
@@ -421,7 +437,9 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                     radius: 40,
                     backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.1),
                     child: Text(
-                      widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
+                      widget.userName.isNotEmpty
+                          ? widget.userName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -441,10 +459,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                   const SizedBox(height: 4),
                   Text(
                     widget.userEmail,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 32),
                   Container(
@@ -477,7 +492,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                   ),
                   const SizedBox(height: 16),
                   Container(
-                     decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                       color: Colors.red[50],
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.red[100]!),

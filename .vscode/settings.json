@@ -1,3 +1,4 @@
 {
-  "cmake.sourceDirectory": "E:/PTUD/app_btl/linux"
+  "cmake.sourceDirectory": "E:/PTUD/app_btl/linux",
+  "java.configuration.updateBuildConfiguration": "interactive"
 }
