@@ -3,9 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/main_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +66,10 @@ class _AppBootstrap extends StatefulWidget {
 
 class _AppBootstrapState extends State<_AppBootstrap> {
   late Future<void> _initializeFuture;
+  SharedPreferences? _preferences;
+  bool _shouldShowOnboarding = false;
+
+  static const String _onboardingSeenKey = 'onboarding_seen_v1';
 
   Future<void> _initializeFirebase() {
     return Firebase.initializeApp(
@@ -71,10 +77,31 @@ class _AppBootstrapState extends State<_AppBootstrap> {
     );
   }
 
+  Future<void> _initializeAppState() async {
+    await _initializeFirebase();
+    _preferences = await SharedPreferences.getInstance();
+    _shouldShowOnboarding =
+        !(_preferences?.getBool(_onboardingSeenKey) ?? false);
+  }
+
+  Future<void> _markOnboardingComplete() async {
+    final preferences = _preferences ?? await SharedPreferences.getInstance();
+    await preferences.setBool(_onboardingSeenKey, true);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _shouldShowOnboarding = false;
+      _preferences = preferences;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    _initializeFuture = _initializeFirebase();
+    _initializeFuture = _initializeAppState();
   }
 
   @override
@@ -127,6 +154,10 @@ class _AppBootstrapState extends State<_AppBootstrap> {
               ),
             ),
           );
+        }
+
+        if (_shouldShowOnboarding) {
+          return OnboardingScreen(onFinished: _markOnboardingComplete);
         }
 
         return const AuthGate();

@@ -18,8 +18,8 @@ class HomeScreen extends StatefulWidget {
     this.userName = 'Explorer',
     this.streak = 8,
     this.level = 5,
-    this.experience = 820,
-    this.nextLevelExperience = 1200,
+    this.experience = 800,
+    this.nextLevelExperience = 1000,
     this.onOpenDecks,
     this.onOpenDictionary,
     this.onOpenCameraQuest,
@@ -32,25 +32,28 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   static const List<Map<String, dynamic>> _dailyMissions = [
     {
-      'title': 'Hoàn thành 3 vòng quét',
-      'xp': '+120 XP',
-      'progress': 0.66,
+      'title': 'Hoàn thành bài ôn tập',
+      'xp': '+100 XP',
+      'current': 3,
+      'total': 3,
       'color': Color(0xFF06C0FF),
-      'icon': Icons.camera_alt_rounded,
-    },
-    {
-      'title': 'Ôn tập 25 thẻ ghi nhớ',
-      'xp': '+90 XP',
-      'progress': 0.48,
-      'color': Color(0xFF7E6BFF),
       'icon': Icons.style_rounded,
     },
     {
-      'title': 'Giữ chuỗi 1 ngày nữa',
+      'title': 'Quét 5 đồ vật mới',
+      'xp': '+50 XP',
+      'current': 2,
+      'total': 5,
+      'color': Color(0xFF7E6BFF),
+      'icon': Icons.camera_alt_rounded,
+    },
+    {
+      'title': 'Học 15 từ vựng mới',
       'xp': '+150 XP',
-      'progress': 0.85,
+      'current': 10,
+      'total': 15,
       'color': Color(0xFFFF7F45),
-      'icon': Icons.local_fire_department_rounded,
+      'icon': Icons.menu_book_rounded,
     },
   ];
 
@@ -527,48 +530,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildStatsRow(double levelProgress) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            title: 'CHUỖI',
-            value: '${widget.streak} ngày',
-            icon: Icons.local_fire_department_rounded,
-            backgroundColor: const Color(0xFFFFF0DD),
-            iconColor: const Color(0xFFFF8C1A),
+    return SizedBox(
+      height: 100,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 1,
+            child: _StatCard(
+              title: 'CHUỖI HỌC',
+              value: '${widget.streak} ngày',
+              icon: Icons.local_fire_department_rounded,
+              backgroundColor: const Color(0xFFFFF0DD),
+              iconColor: const Color(0xFFFF8C1A),
+              gradientColors: const [Color(0xFFFFF0DD), Color(0xFFFFE0B6)],
+              animationDelay: 0,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            title: 'CẤP ĐỘ',
-            value: 'Lv.${widget.level}',
-            icon: Icons.military_tech_rounded,
-            backgroundColor: const Color(0xFFEAF1FF),
-            iconColor: const Color(0xFF3269FF),
-            trailing: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${widget.experience}/${widget.nextLevelExperience} XP',
-                  style: TextStyle(
-                    color: Colors.blue.shade700,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 1,
+            child: _StatCard(
+              title: 'CẤP ĐỘ ${widget.level}',
+              value: '${widget.experience}/${widget.nextLevelExperience} XP',
+              valueSize: 16,
+              icon: Icons.military_tech_rounded,
+              backgroundColor: const Color(0xFFEAF1FF),
+              iconColor: const Color(0xFF3269FF),
+              gradientColors: const [Color(0xFFEAF1FF), Color(0xFFC7DEFF)],
+              animationDelay: 100,
+              trailing: Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0.0, end: levelProgress),
-                    duration: const Duration(milliseconds: 1000),
-                    curve: Curves.easeOutCubic,
+                    duration: const Duration(milliseconds: 1500),
+                    curve: Curves.elasticOut,
                     builder: (context, animatedProgress, child) {
                       return LinearProgressIndicator(
-                        minHeight: 7,
+                        minHeight: 6,
                         value: animatedProgress,
-                        backgroundColor: Colors.blue.shade100,
+                        backgroundColor: Colors.white70,
                         valueColor: const AlwaysStoppedAnimation(
                           Color(0xFF4A81FF),
                         ),
@@ -576,11 +579,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     },
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -588,20 +591,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return _FrostedPanel(
       title: 'Nhiệm vụ hằng ngày',
       subtitle: 'Hoàn thành để nhận thêm XP',
-      actionLabel: 'Chi tiết',
-      onActionTap: () {},
+      actionLabel: '',
+      onActionTap: null,
       child: Column(
         children: _dailyMissions.map((mission) {
           final color = mission['color'] as Color;
+          final current = mission['current'] as int;
+          final total = mission['total'] as int;
+          final isCompleted = current >= total;
+          final displayColor = isCompleted ? const Color(0xFF6EE7B7) : color;
+          final progress = (current / total).clamp(0.0, 1.0);
+
           return _BounceTap(
             onTap: () {},
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50.withOpacity(0.8),
+                color: isCompleted
+                    ? const Color(0xFFE8FFF5)
+                    : Colors.grey.shade50.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(
+                  color: isCompleted
+                      ? displayColor.withOpacity(0.5)
+                      : Colors.grey.shade200,
+                ),
               ),
               child: Row(
                 children: [
@@ -985,12 +1000,9 @@ class _SectionReveal extends StatelessWidget {
       duration: Duration(milliseconds: 540 + delayMs),
       curve: Curves.easeOutCubic,
       builder: (context, value, animatedChild) {
-        return Opacity(
-          opacity: value.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(0, (1 - value) * 30),
-            child: animatedChild,
-          ),
+        return Transform.translate(
+          offset: Offset(0, (1 - value) * 40),
+          child: animatedChild,
         );
       },
       child: child,
@@ -1049,18 +1061,24 @@ class _BounceTapState extends State<_BounceTap>
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
+  final double valueSize;
   final IconData icon;
   final Widget? trailing;
   final Color backgroundColor;
   final Color iconColor;
+  final List<Color> gradientColors;
+  final int animationDelay;
 
   const _StatCard({
     required this.title,
     required this.value,
+    this.valueSize = 23,
     required this.icon,
     this.trailing,
     required this.backgroundColor,
     required this.iconColor,
+    this.gradientColors = const [Colors.white, Colors.white],
+    this.animationDelay = 0,
   });
 
   @override
