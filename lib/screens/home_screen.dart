@@ -18,8 +18,8 @@ class HomeScreen extends StatefulWidget {
     this.userName = 'Explorer',
     this.streak = 8,
     this.level = 5,
-    this.experience = 820,
-    this.nextLevelExperience = 1200,
+    this.experience = 800,
+    this.nextLevelExperience = 1000,
     this.onOpenDecks,
     this.onOpenDictionary,
     this.onOpenCameraQuest,
@@ -33,25 +33,28 @@ class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin {
   static const List<Map<String, dynamic>> _dailyMissions = [
     {
-      'title': 'Hoàn thành 3 vòng quét',
-      'xp': '+120 XP',
-      'progress': 0.66,
+      'title': 'Hoàn thành bài ôn tập',
+      'xp': '+100 XP',
+      'current': 3,
+      'total': 3,
       'color': Color(0xFF06C0FF),
-      'icon': Icons.camera_alt_rounded,
-    },
-    {
-      'title': 'Ôn tập 25 thẻ ghi nhớ',
-      'xp': '+90 XP',
-      'progress': 0.48,
-      'color': Color(0xFF7E6BFF),
       'icon': Icons.style_rounded,
     },
     {
-      'title': 'Giữ chuỗi 1 ngày nữa',
+      'title': 'Quét 5 đồ vật mới',
+      'xp': '+50 XP',
+      'current': 2,
+      'total': 5,
+      'color': Color(0xFF7E6BFF),
+      'icon': Icons.camera_alt_rounded,
+    },
+    {
+      'title': 'Học 15 từ vựng mới',
       'xp': '+150 XP',
-      'progress': 0.85,
+      'current': 10,
+      'total': 15,
       'color': Color(0xFFFF7F45),
-      'icon': Icons.local_fire_department_rounded,
+      'icon': Icons.menu_book_rounded,
     },
   ];
 
@@ -565,48 +568,48 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildStatsRow(double levelProgress) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            title: 'CHUỖI',
-            value: '${widget.streak} ngày',
-            icon: Icons.local_fire_department_rounded,
-            backgroundColor: const Color(0xFFFFF0DD),
-            iconColor: const Color(0xFFFF8C1A),
+    return SizedBox(
+      height: 100,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 1,
+            child: _StatCard(
+              title: 'CHUỖI HỌC',
+              value: '${widget.streak} ngày',
+              icon: Icons.local_fire_department_rounded,
+              backgroundColor: const Color(0xFFFFF0DD),
+              iconColor: const Color(0xFFFF8C1A),
+              gradientColors: const [Color(0xFFFFF0DD), Color(0xFFFFE0B6)],
+              animationDelay: 0,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            title: 'CẤP ĐỘ',
-            value: 'Lv.${widget.level}',
-            icon: Icons.military_tech_rounded,
-            backgroundColor: const Color(0xFFEAF1FF),
-            iconColor: const Color(0xFF3269FF),
-            trailing: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${widget.experience}/${widget.nextLevelExperience} XP',
-                  style: TextStyle(
-                    color: Colors.blue.shade700,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 1,
+            child: _StatCard(
+              title: 'CẤP ĐỘ ${widget.level}',
+              value: '${widget.experience}/${widget.nextLevelExperience} XP',
+              valueSize: 16,
+              icon: Icons.military_tech_rounded,
+              backgroundColor: const Color(0xFFEAF1FF),
+              iconColor: const Color(0xFF3269FF),
+              gradientColors: const [Color(0xFFEAF1FF), Color(0xFFC7DEFF)],
+              animationDelay: 100,
+              trailing: Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0.0, end: levelProgress),
-                    duration: const Duration(milliseconds: 1000),
-                    curve: Curves.easeOutCubic,
+                    duration: const Duration(milliseconds: 1500),
+                    curve: Curves.elasticOut,
                     builder: (context, animatedProgress, child) {
                       return LinearProgressIndicator(
-                        minHeight: 7,
+                        minHeight: 6,
                         value: animatedProgress,
-                        backgroundColor: Colors.blue.shade100,
+                        backgroundColor: Colors.white70,
                         valueColor: const AlwaysStoppedAnimation(
                           Color(0xFF4A81FF),
                         ),
@@ -614,11 +617,11 @@ class _HomeScreenState extends State<HomeScreen>
                     },
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -626,68 +629,107 @@ class _HomeScreenState extends State<HomeScreen>
     return _FrostedPanel(
       title: 'Nhiệm vụ hằng ngày',
       subtitle: 'Hoàn thành để nhận thêm XP',
-      actionLabel: 'Chi tiết',
-      onActionTap: () {},
+      actionLabel: '',
+      onActionTap: null,
       child: Column(
         children: _dailyMissions.map((mission) {
           final color = mission['color'] as Color;
+          final current = mission['current'] as int;
+          final total = mission['total'] as int;
+          final isCompleted = current >= total;
+          final displayColor = isCompleted ? const Color(0xFF6EE7B7) : color;
+          final progress = (current / total).clamp(0.0, 1.0);
+
           return _BounceTap(
             onTap: () {},
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50.withOpacity(0.8),
+                color: isCompleted ? const Color(0xFFE8FFF5) : Colors.grey.shade50.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(
+                  color: isCompleted ? displayColor.withOpacity(0.5) : Colors.grey.shade200,
+                ),
               ),
               child: Row(
                 children: [
                   Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(12),
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: displayColor.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      isCompleted ? Icons.check_circle_rounded : mission['icon'] as IconData,
+                      color: displayColor,
+                    ),
                   ),
-                  child: Icon(mission['icon'] as IconData, color: color),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mission['title'] as String,
-                        style: const TextStyle(
-                          color: Color(0xFF2D3142),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                mission['title'] as String,
+                                style: TextStyle(
+                                  color: isCompleted ? const Color(0xFF0F6E4D) : const Color(0xFF2D3142),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              isCompleted ? 'Đã hoàn thành' : '$current/$total',
+                              style: TextStyle(
+                                color: isCompleted ? const Color(0xFF0F6E4D) : Colors.blueGrey.shade600,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          minHeight: 7,
-                          value: mission['progress'] as double,
-                          backgroundColor: color.withOpacity(0.15),
-                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0, end: progress),
+                            duration: const Duration(milliseconds: 1000),
+                            curve: Curves.easeOut,
+                            builder: (context, animatedProgress, child) {
+                              return LinearProgressIndicator(
+                                minHeight: 7,
+                                value: animatedProgress,
+                                backgroundColor: displayColor.withOpacity(0.15),
+                                valueColor: AlwaysStoppedAnimation<Color>(displayColor),
+                              );
+                            },
+                          ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 64, // Cố định chiều rộng để thanh tiến trình của các thẻ luôn bằng nhau
+                    child: Text(
+                      mission['xp'] as String,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: isCompleted ? Colors.blueGrey.shade400 : displayColor,
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  mission['xp'] as String,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
+                ],
+              ),
             ),
           );
         }).toList(),
@@ -1025,12 +1067,9 @@ class _SectionReveal extends StatelessWidget {
       duration: Duration(milliseconds: 540 + delayMs),
       curve: Curves.easeOutCubic,
       builder: (context, value, animatedChild) {
-        return Opacity(
-          opacity: value.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(0, (1 - value) * 30),
-            child: animatedChild,
-          ),
+        return Transform.translate(
+          offset: Offset(0, (1 - value) * 40),
+          child: animatedChild,
         );
       },
       child: child,
@@ -1084,76 +1123,183 @@ class _BounceTapState extends State<_BounceTap> with SingleTickerProviderStateMi
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
+  final double valueSize;
   final IconData icon;
   final Widget? trailing;
   final Color backgroundColor;
   final Color iconColor;
+  final List<Color> gradientColors;
+  final int animationDelay;
 
   const _StatCard({
     required this.title,
     required this.value,
+    this.valueSize = 23,
     required this.icon,
     this.trailing,
     required this.backgroundColor,
     required this.iconColor,
+    this.gradientColors = const [Colors.white, Colors.white],
+    this.animationDelay = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 20, color: iconColor),
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.8, end: 1.0),
+      duration: Duration(milliseconds: 600 + animationDelay),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            clipBehavior: Clip.hardEdge,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF42516E),
-                  fontSize: 12,
-                  letterSpacing: 0.7,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: iconColor.withOpacity(0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
+                BoxShadow(
+                  color: Colors.white,
+                  blurRadius: 2,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 0),
+                )
+              ],
+              border: Border.all(
+                color: Colors.white.withOpacity(0.8),
+                width: 1.5,
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 23,
-              color: Color(0xFF0B1C3D),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: -20,
+                  right: -20,
+                  child: Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: -30,
+                  left: -10,
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.2),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -8,
+                  bottom: -15,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 1400),
+                    curve: Curves.elasticOut,
+                    builder: (context, val, child) {
+                      return Transform.translate(
+                        offset: Offset(0, (1 - val) * 20),
+                        child: Transform.rotate(
+                          angle: -0.2 * val,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Icon(
+                      icon,
+                      size: 80,
+                      color: iconColor.withOpacity(0.18),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.white, Colors.white.withOpacity(0.8)],
+                                begin: Alignment.topRight,
+                                end: Alignment.bottomLeft,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: iconColor.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                )
+                              ],
+                            ),
+                            child: Icon(icon, size: 20, color: iconColor),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: iconColor.withOpacity(0.8),
+                                fontSize: 12,
+                                letterSpacing: 0.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          value,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: valueSize,
+                            color: const Color(0xFF0B1C3D),
+                            shadows: [
+                              Shadow(
+                                color: Colors.white.withOpacity(0.8),
+                                offset: const Offset(0, 1),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (trailing != null) trailing!,
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(height: 6),
-            trailing!,
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1225,16 +1371,17 @@ class _FrostedPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: onActionTap,
-                child: Text(
-                  actionLabel,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1D74FF),
+              if (actionLabel.isNotEmpty)
+                TextButton(
+                  onPressed: onActionTap,
+                  child: Text(
+                    actionLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1D74FF),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 10),
