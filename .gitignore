@@ -112,3 +112,4 @@ migrate_working_dir/
 **/ephemeral/
 # Linux generated (Flutter)
 linux/flutter/generated_*
+windows/flutter/generated_*
