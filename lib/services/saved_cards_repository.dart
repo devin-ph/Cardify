@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -66,7 +65,7 @@ class SavedCardsRepository {
   }
 
   String _storageScope() {
-    final userId = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
     return (userId == null || userId.isEmpty) ? 'anonymous' : userId;
   }
 

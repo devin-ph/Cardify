@@ -1,4 +1,4 @@
-import 'package:app_btl/screens/deck_list_screen.dart';
+import 'package:cardify_ai_english_learning_app/screens/deck_list_screen.dart';
 import 'package:flutter/material.dart';
 import '../widgets/ai_voice_chat_dialog.dart';
 import '../widgets/profile_icon.dart';

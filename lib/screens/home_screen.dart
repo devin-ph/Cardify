@@ -530,8 +530,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildStatsRow(double levelProgress) {
-    return SizedBox(
-      height: 116,
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -540,10 +539,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: _StatCard(
               title: 'CHUỖI HỌC',
               value: '${widget.streak} ngày',
+              valueSize: 24,
               icon: Icons.local_fire_department_rounded,
               backgroundColor: const Color(0xFFFFF0DD),
               iconColor: const Color(0xFFFF8C1A),
-              gradientColors: const [Color(0xFFFFF0DD), Color(0xFFFFE0B6)],
+              gradientColors: const [Color(0xFFFFF4E5), Color(0xFFFFD19A)],
               animationDelay: 0,
             ),
           ),
@@ -553,11 +553,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: _StatCard(
               title: 'CẤP ĐỘ ${widget.level}',
               value: '${widget.experience}/${widget.nextLevelExperience} XP',
-              valueSize: 16,
+              valueSize: 17,
               icon: Icons.military_tech_rounded,
               backgroundColor: const Color(0xFFEAF1FF),
               iconColor: const Color(0xFF3269FF),
-              gradientColors: const [Color(0xFFEAF1FF), Color(0xFFC7DEFF)],
+              gradientColors: const [Color(0xFFF2F6FF), Color(0xFFB9D4FF)],
               animationDelay: 100,
               trailing: Padding(
                 padding: const EdgeInsets.only(top: 4.0),
@@ -624,10 +624,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.18),
+                      color: isCompleted
+                          ? const Color(0xFF10B981).withOpacity(0.15)
+                          : color.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(mission['icon'] as IconData, color: color),
+                    child: Icon(
+                      isCompleted
+                          ? Icons.check_circle_rounded
+                          : mission['icon'] as IconData,
+                      color: isCompleted ? const Color(0xFF10B981) : color,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -636,21 +643,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       children: [
                         Text(
                           mission['title'] as String,
-                          style: const TextStyle(
-                            color: Color(0xFF2D3142),
+                          style: TextStyle(
+                            color: isCompleted
+                                ? const Color(0xFF104A33)
+                                : const Color(0xFF2D3142),
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
+                            decoration: isCompleted
+                                ? TextDecoration.none
+                                : null,
                           ),
                         ),
                         const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            minHeight: 7,
-                            value: progress,
-                            backgroundColor: color.withOpacity(0.15),
-                            valueColor: AlwaysStoppedAnimation<Color>(color),
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: LinearProgressIndicator(
+                                  minHeight: 7,
+                                  value: progress,
+                                  backgroundColor: isCompleted
+                                      ? displayColor.withOpacity(0.2)
+                                      : color.withOpacity(0.15),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    displayColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${current > total ? total : current}/$total',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: displayColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -658,7 +689,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   const SizedBox(width: 10),
                   Text(
                     mission['xp'] as String,
-                    style: TextStyle(color: color, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                      color: isCompleted ? const Color(0xFF10B981) : color,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -1084,54 +1119,108 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      clipBehavior: Clip.hardEdge,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.8), width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: iconColor.withOpacity(0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 20, color: iconColor),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF42516E),
-                  fontSize: 12,
-                  letterSpacing: 0.7,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 23,
-              color: Color(0xFF0B1C3D),
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Transform.rotate(
+              angle: -0.2,
+              child: Icon(icon, size: 90, color: Colors.white.withOpacity(0.4)),
             ),
           ),
-          if (trailing != null) ...[const SizedBox(height: 6), trailing!],
+          Positioned(
+            top: -30,
+            right: -10,
+            child: Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.6),
+                    Colors.white.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: iconColor.withOpacity(0.15),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(icon, size: 20, color: iconColor),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: iconColor.withOpacity(0.95),
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: valueSize,
+                  color: const Color(0xFF0B1C3D),
+                  height: 1.1,
+                  shadows: [
+                    Shadow(
+                      color: Colors.white.withOpacity(0.8),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[const SizedBox(height: 8), trailing!],
+            ],
+          ),
         ],
       ),
     );

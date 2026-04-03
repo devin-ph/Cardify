@@ -328,17 +328,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text(
-                      'THÀNH TỰU',
-                      style: TextStyle(
-                        color: Color(0xFF3B82F6),
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
                     SizedBox(height: 6),
                     Text(
-                      'Đại sảnh Danh vọng',
+                      'THÀNH TỰU',
                       style: TextStyle(
                         color: Color(0xFF102956),
                         fontWeight: FontWeight.w900,
@@ -1272,57 +1264,79 @@ class _QuickStat extends StatelessWidget {
           children: [
             Positioned(
               right: -12,
-              top: -8,
+              bottom: -12,
               child: Transform.rotate(
-                angle: 0.15,
-                child: Icon(icon, size: 65, color: color.withOpacity(0.12)),
+                angle: -0.2,
+                child: Icon(icon, size: 70, color: color.withOpacity(0.12)),
               ),
             ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withOpacity(0.15),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
+            Positioned(
+              top: -20,
+              right: -10,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.8),
+                      Colors.white.withOpacity(0.0),
                     ],
                   ),
-                  child: Icon(icon, color: color, size: 22),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text(
-                          value,
-                          style: const TextStyle(
-                            color: Color(0xFF0B1C3D),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 20,
-                            height: 1.1,
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withOpacity(0.15),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
+                        ],
                       ),
-                      Text(
+                      child: Icon(icon, color: color, size: 18),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
                         label,
                         style: TextStyle(
-                          color: color.withOpacity(0.9),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                          height: 1.1,
+                          color: color.withOpacity(0.95),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                          letterSpacing: 0.5,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Color(0xFF0B1C3D),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    height: 1.1,
+                    shadows: [
+                      Shadow(
+                        color: Colors.white,
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
