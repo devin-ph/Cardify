@@ -531,7 +531,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildStatsRow(double levelProgress) {
     return SizedBox(
-      height: 100,
+      height: 116,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -647,7 +647,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           borderRadius: BorderRadius.circular(8),
                           child: LinearProgressIndicator(
                             minHeight: 7,
-                            value: mission['progress'] as double,
+                            value: progress,
                             backgroundColor: color.withOpacity(0.15),
                             valueColor: AlwaysStoppedAnimation<Color>(color),
                           ),
