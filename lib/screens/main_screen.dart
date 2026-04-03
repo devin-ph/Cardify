@@ -227,15 +227,25 @@ class _MainScreenState extends State<MainScreen> {
         centerTitle: true,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.chat_bubble),
-            onPressed: _onChatTap,
-            tooltip: 'Chat với AI',
-          ),
           ProfileIcon(onTap: _onProfileTap),
         ],
       ),
-        body: _getBody(),
+        body: Stack(
+          children: [
+            _getBody(),
+            Positioned(
+              right: 16,
+              bottom: 92,
+              child: FloatingActionButton(
+                heroTag: 'ai_chat_fab',
+                mini: true,
+                onPressed: _onChatTap,
+                tooltip: 'Chat với AI',
+                child: const Icon(Icons.chat_bubble),
+              ),
+            ),
+          ],
+        ),
         floatingActionButton: Padding(
           padding: const EdgeInsets.only(bottom: 28.0),
           child: FloatingActionButton(
