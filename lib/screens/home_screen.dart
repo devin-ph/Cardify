@@ -673,12 +673,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              '${current > total ? total : current}/$total',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: displayColor,
+                            SizedBox(
+                              width: 36,
+                              child: Text(
+                                '${current > total ? total : current}/$total',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: displayColor,
+                                ),
                               ),
                             ),
                           ],
@@ -687,12 +691,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    mission['xp'] as String,
-                    style: TextStyle(
-                      color: isCompleted ? const Color(0xFF10B981) : color,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      mission['xp'] as String,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: isCompleted ? Colors.grey.shade500 : color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
