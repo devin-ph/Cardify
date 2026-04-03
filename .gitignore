@@ -2,7 +2,6 @@
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-<<<<<<< HEAD
 .packages
 .pub/
 build/
@@ -27,13 +26,10 @@ build/
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-=======
->>>>>>> 2a3f4985a9baac7e17822a0598e1de0f7601729f
 .pub-cache/
 .pub/
 build/
 
-<<<<<<< HEAD
 # Key & Env (Bảo mật)
 .env
 *.jks
@@ -57,12 +53,9 @@ app.*.map.json
 ios/Pods/
 
 # Generated files
-=======
 # Generated files (Cực kỳ quan trọng để tránh conflict nhóm)
-**/pubspec.lock
 **/generated_plugin_registrant.*
 **/generated_plugins.*
->>>>>>> 2a3f4985a9baac7e17822a0598e1de0f7601729f
 **/GeneratedPluginRegistrant.*
 **/*.g.dart
 **/ephemeral/
