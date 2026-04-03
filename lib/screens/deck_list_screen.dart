@@ -62,28 +62,10 @@ class _DeckListScreenState extends State<DeckListScreen> {
       'favorite': false,
     },
     {
-      'icon': Icons.sports_basketball,
-      'title': 'Hoạt động',
-      'desc': 'Từ vựng về các hoạt động và trò chơi',
-      'favorite': false,
-    },
-    {
       'icon': Icons.palette,
       'title': 'Màu sắc',
       'desc': 'Từ vựng về các màu sắc',
       'favorite': true,
-    },
-    {
-      'icon': Icons.location_on,
-      'title': 'Không gian',
-      'desc': 'Từ vựng về các vị trí và không gian',
-      'favorite': false,
-    },
-    {
-      'icon': Icons.schedule,
-      'title': 'Thời gian',
-      'desc': 'Từ vựng về thời gian và lịch',
-      'favorite': false,
     },
   ];
 
@@ -299,17 +281,41 @@ class _DeckListScreenState extends State<DeckListScreen> {
                   ),
                 ),
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    itemCount: filteredDecks.length,
-                    itemBuilder: (context, idx) {
-                      final deck = filteredDecks[idx];
-                      return _buildDeckCard(deck, cards);
-                    },
-                  ),
+                  child: filteredDecks.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Không tìm thấy bộ thẻ phù hợp',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          itemCount: filteredDecks.length,
+                          itemBuilder: (context, idx) {
+                            final deck = filteredDecks[idx];
+                            return _buildDeckCard(
+                              deck,
+                              cards,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => FlashcardScreen(
+                                      selectedTopic: deck['title'] as String,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                 ),
               ],
             );
@@ -344,7 +350,11 @@ class _DeckListScreenState extends State<DeckListScreen> {
     );
   }
 
-  Widget _buildDeckCard(Map<String, dynamic> deck, List<SavedCard> cards) {
+  Widget _buildDeckCard(
+    Map<String, dynamic> deck,
+    List<SavedCard> cards, {
+    required VoidCallback onTap,
+  }) {
     final isFavorite = deck['favorite'] as bool;
     final title = deck['title'] as String;
     final stats = _getDeckStats(title, cards);
@@ -353,131 +363,111 @@ class _DeckListScreenState extends State<DeckListScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F0FE),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.all(10),
-                  child: Icon(
-                    deck['icon'],
-                    color: const Color(0xFF0A5DB6),
-                    size: 32,
-                  ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 92,
+                height: 92,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0FE),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        deck['title'] as String,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        deck['desc'] as String,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
+                alignment: Alignment.center,
+                child: Icon(
+                  deck['icon'],
+                  color: const Color(0xFF0A5DB6),
+                  size: 52,
                 ),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      deck['favorite'] = !isFavorite;
-                    });
-                  },
-                  splashRadius: 22,
-                  icon: Icon(
-                    isFavorite ? Icons.star : Icons.star_border,
-                    color: isFavorite
-                        ? const Color(0xFFF4B400)
-                        : const Color(0xFF0A5DB6),
-                  ),
-                  tooltip: isFavorite
-                      ? 'Bỏ khỏi yêu thích'
-                      : 'Thêm vào yêu thích',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  '${stats.remembered}/${stats.total} thẻ đã ghi nhớ',
-                  style: const TextStyle(fontSize: 13, color: Colors.black87),
-                ),
-                const Spacer(),
-                Text(
-                  '${(stats.progress * 100).toInt()}%',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF0A5DB6),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            LinearProgressIndicator(
-              value: stats.progress,
-              backgroundColor: const Color(0xFFE8F0FE),
-              color: const Color(0xFF0A5DB6),
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A5DB6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FlashcardScreen(
-                        selectedTopic: deck['title'] as String,
-                      ),
-                    ),
-                  );
-                },
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Luyện tập',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                deck['title'] as String,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                deck['desc'] as String,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              deck['favorite'] = !isFavorite;
+                            });
+                          },
+                          splashRadius: 22,
+                          icon: Icon(
+                            isFavorite ? Icons.star : Icons.star_border,
+                            color: isFavorite
+                                ? const Color(0xFFF4B400)
+                                : const Color(0xFF0A5DB6),
+                          ),
+                          tooltip: isFavorite
+                              ? 'Bỏ khỏi yêu thích'
+                              : 'Thêm vào yêu thích',
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward, size: 20),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text(
+                          '${stats.remembered}/${stats.total} thẻ đã ghi nhớ',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${(stats.progress * 100).toInt()}%',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF0A5DB6),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: stats.progress,
+                      backgroundColor: const Color(0xFFE8F0FE),
+                      color: const Color(0xFF0A5DB6),
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

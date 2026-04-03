@@ -1,54 +1,31 @@
-import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-String _authErrorMessage(FirebaseAuthException error) {
-  switch (error.code) {
-    case 'channel-error':
-      return 'Firebase Auth chưa kết nối với app. Hay tắt app đang chạy và chạy lại.';
-    case 'internal-error':
-      if ((error.message ?? '').contains('FirebaseAuthHostApi')) {
-        return 'Firebase Auth chưa tải plugin native. Hay chạy lại app từ đầu sau khi flutter clean và flutter pub get.';
-      }
-      return ' lỗi hệ thống tạm thời, vui lòng thử lại.';
-    case 'invalid-email':
-      return 'Email không hợp lệ.';
-    case 'user-not-found':
-    case 'wrong-password':
-    case 'invalid-credential':
-      return 'Email hoặc mật khẩu chưa đúng.';
-    case 'email-already-in-use':
-      return 'Email này đã được sử dụng.';
-    case 'weak-password':
-      return 'Mật khẩu quá yếu, hay dùng ít nhất 6 ký tự.';
-    case 'too-many-requests':
-      return 'Bạn thao tác quá nhiều lần, hay thử lại sau ít phút.';
-    case 'network-request-failed':
-      return 'Không có kết nối mạng. Vui lòng thử lại.';
-    default:
-      return error.message ?? 'Đã có lỗi xác thực, vui lòng thử lại.';
+String _authErrorMessage(Object error) {
+  final message = error.toString().toLowerCase();
+
+  if (message.contains('invalid login credentials')) {
+    return 'Email hoặc mật khẩu chưa đúng.';
   }
+  if (message.contains('user already registered') ||
+      message.contains('already registered')) {
+    return 'Email này đã được sử dụng.';
+  }
+  if (message.contains('password should be at least')) {
+    return 'Mật khẩu quá yếu, hãy dùng ít nhất 6 ký tự.';
+  }
+  if (message.contains('email not confirmed')) {
+    return 'Email chưa được xác nhận. Hãy kiểm tra hộp thư.';
+  }
+  if (message.contains('network') || message.contains('failed to fetch')) {
+    return 'Không có kết nối mạng. Vui lòng thử lại.';
+  }
+
+  return 'Đã có lỗi xác thực, vui lòng thử lại.';
 }
 
 Future<void> _googleSignIn() async {
-  if (kIsWeb) {
-    await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
-    return;
-  }
-
-  final googleUser = await GoogleSignIn(scopes: <String>['email']).signIn();
-  if (googleUser == null) {
-    return;
-  }
-
-  final googleAuth = await googleUser.authentication;
-  final credential = GoogleAuthProvider.credential(
-    accessToken: googleAuth.accessToken,
-    idToken: googleAuth.idToken,
-  );
-
-  await FirebaseAuth.instance.signInWithCredential(credential);
+  await Supabase.instance.client.auth.signInWithOAuth(OAuthProvider.google);
 }
 
 class CardifyLoginScreen extends StatefulWidget {
@@ -102,11 +79,11 @@ class _CardifyLoginScreenState extends State<CardifyLoginScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
-    } on FirebaseAuthException catch (error) {
+    } catch (error) {
       _showMessage(_authErrorMessage(error), isError: true);
     } catch (_) {
       _showMessage(
@@ -133,7 +110,7 @@ class _CardifyLoginScreenState extends State<CardifyLoginScreen> {
 
     try {
       await _googleSignIn();
-    } on FirebaseAuthException catch (error) {
+    } catch (error) {
       _showMessage(_authErrorMessage(error), isError: true);
     } catch (_) {
       _showMessage(
@@ -161,9 +138,9 @@ class _CardifyLoginScreenState extends State<CardifyLoginScreen> {
     }
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
       _showMessage('Đã gửi email đặt lại mật khẩu.');
-    } on FirebaseAuthException catch (error) {
+    } catch (error) {
       _showMessage(_authErrorMessage(error), isError: true);
     } catch (_) {
       _showMessage(
@@ -333,11 +310,15 @@ class _CardifyRegisterScreenState extends State<CardifyRegisterScreen> {
     });
 
     try {
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(email: email, password: password);
-      await credential.user?.updateDisplayName(username);
-      _showMessage('Tạo tài khoản thành công.');
-    } on FirebaseAuthException catch (error) {
+      await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: <String, dynamic>{'username': username},
+      );
+      _showMessage(
+        'Tạo tài khoản thành công. Hãy kiểm tra email nếu cần xác nhận.',
+      );
+    } catch (error) {
       _showMessage(_authErrorMessage(error), isError: true);
     } catch (_) {
       _showMessage(
@@ -364,7 +345,7 @@ class _CardifyRegisterScreenState extends State<CardifyRegisterScreen> {
 
     try {
       await _googleSignIn();
-    } on FirebaseAuthException catch (error) {
+    } catch (error) {
       _showMessage(_authErrorMessage(error), isError: true);
     } catch (_) {
       _showMessage(

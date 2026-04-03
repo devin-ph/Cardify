@@ -14,25 +14,122 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   late final AnimationController _ambientController;
   late final AnimationController _progressController;
 
-  static const int _userTotalCardsStudied = 120; // Mock current user total cards
-  static const int _userTotalSetsCompleted = 4;   // Mock user total sets
+  static const int _userTotalCardsStudied =
+      120; // Mock current user total cards
+  static const int _userTotalSetsCompleted = 4; // Mock user total sets
   static const int _currentStreak = 8;
 
   bool _showAllBadges = false;
 
   static const List<Map<String, dynamic>> _oasisElements = [
-    {'id': 'mushrooms', 'name': 'Hạt mầm', 'desc': 'Học 10 thẻ', 'icon': '🌱', 'reqType': 'cards', 'reqValue': 10, 'color': Color(0xFF34D399)},
-    {'id': 'flowers', 'name': 'Bụi hoa', 'desc': 'Hoàn thành 1 bộ thẻ', 'icon': '🌺', 'reqType': 'sets', 'reqValue': 1, 'color': Color(0xFFF472B6)},
-    {'id': 'trees', 'name': 'Cây xanh', 'desc': 'Hoàn thành 3 bộ thẻ', 'icon': '🌳', 'reqType': 'sets', 'reqValue': 3, 'color': Color(0xFF4ADE80)},
-    {'id': 'animals', 'name': 'Động vật', 'desc': 'Hoàn thành 5 bộ thẻ', 'icon': '🦌', 'reqType': 'sets', 'reqValue': 5, 'color': Color(0xFF10B981)},
-    {'id': 'household', 'name': 'Nhà nấm', 'desc': 'Hoàn thành 8 bộ thẻ', 'icon': '🍄', 'reqType': 'sets', 'reqValue': 8, 'color': Color(0xFFF87171)},
-    {'id': 'tent', 'name': 'Lều trại', 'desc': 'Học 50 thẻ', 'icon': '⛺', 'reqType': 'cards', 'reqValue': 50, 'color': Color(0xFF60A5FA)},
-    {'id': 'lighthouse', 'name': 'Hải đăng', 'desc': 'Học 100 thẻ', 'icon': '🗼', 'reqType': 'cards', 'reqValue': 100, 'color': Color(0xFF2563EB)},
-    {'id': 'castle', 'name': 'Lâu đài', 'desc': 'Học 200 thẻ', 'icon': '🏰', 'reqType': 'cards', 'reqValue': 200, 'color': Color(0xFFA78BFA)},
-    {'id': 'airballoon', 'name': 'Khí cầu', 'desc': 'Học 300 thẻ', 'icon': '🎈', 'reqType': 'cards', 'reqValue': 300, 'color': Color(0xFFFBBF24)},
-    {'id': 'space', 'name': 'Vũ trụ', 'desc': 'Học 500 thẻ', 'icon': '🚀', 'reqType': 'cards', 'reqValue': 500, 'color': Color(0xFFC084FC)},
-    {'id': 'rabbit', 'name': 'Thỏ trắng', 'desc': 'Chuỗi học 7 ngày', 'icon': '🐇', 'reqType': 'Số ngày', 'reqValue': 7, 'color': Color(0xFFDC2626)},
-    {'id': 'magic', 'name': 'Pháp thuật', 'desc': 'Chuỗi học 14 ngày', 'icon': '✨', 'reqType': 'Số ngày', 'reqValue': 14, 'color': Color(0xFFFDE047)},
+    {
+      'id': 'mushrooms',
+      'name': 'Hạt mầm',
+      'desc': 'Học 10 thẻ',
+      'icon': '🌱',
+      'reqType': 'cards',
+      'reqValue': 10,
+      'color': Color(0xFF34D399),
+    },
+    {
+      'id': 'flowers',
+      'name': 'Bụi hoa',
+      'desc': 'Hoàn thành 1 bộ thẻ',
+      'icon': '🌺',
+      'reqType': 'sets',
+      'reqValue': 1,
+      'color': Color(0xFFF472B6),
+    },
+    {
+      'id': 'trees',
+      'name': 'Cây xanh',
+      'desc': 'Hoàn thành 3 bộ thẻ',
+      'icon': '🌳',
+      'reqType': 'sets',
+      'reqValue': 3,
+      'color': Color(0xFF4ADE80),
+    },
+    {
+      'id': 'animals',
+      'name': 'Động vật',
+      'desc': 'Hoàn thành 5 bộ thẻ',
+      'icon': '🦌',
+      'reqType': 'sets',
+      'reqValue': 5,
+      'color': Color(0xFF10B981),
+    },
+    {
+      'id': 'household',
+      'name': 'Nhà nấm',
+      'desc': 'Hoàn thành 8 bộ thẻ',
+      'icon': '🍄',
+      'reqType': 'sets',
+      'reqValue': 8,
+      'color': Color(0xFFF87171),
+    },
+    {
+      'id': 'tent',
+      'name': 'Lều trại',
+      'desc': 'Học 50 thẻ',
+      'icon': '⛺',
+      'reqType': 'cards',
+      'reqValue': 50,
+      'color': Color(0xFF60A5FA),
+    },
+    {
+      'id': 'lighthouse',
+      'name': 'Hải đăng',
+      'desc': 'Học 100 thẻ',
+      'icon': '🗼',
+      'reqType': 'cards',
+      'reqValue': 100,
+      'color': Color(0xFF2563EB),
+    },
+    {
+      'id': 'castle',
+      'name': 'Lâu đài',
+      'desc': 'Học 200 thẻ',
+      'icon': '🏰',
+      'reqType': 'cards',
+      'reqValue': 200,
+      'color': Color(0xFFA78BFA),
+    },
+    {
+      'id': 'airballoon',
+      'name': 'Khí cầu',
+      'desc': 'Học 300 thẻ',
+      'icon': '🎈',
+      'reqType': 'cards',
+      'reqValue': 300,
+      'color': Color(0xFFFBBF24),
+    },
+    {
+      'id': 'space',
+      'name': 'Vũ trụ',
+      'desc': 'Học 500 thẻ',
+      'icon': '🚀',
+      'reqType': 'cards',
+      'reqValue': 500,
+      'color': Color(0xFFC084FC),
+    },
+    {
+      'id': 'rabbit',
+      'name': 'Thỏ trắng',
+      'desc': 'Chuỗi học 7 ngày',
+      'icon': '🐇',
+      'reqType': 'Số ngày',
+      'reqValue': 7,
+      'color': Color(0xFFDC2626),
+    },
+    {
+      'id': 'magic',
+      'name': 'Pháp thuật',
+      'desc': 'Chuỗi học 14 ngày',
+      'icon': '✨',
+      'reqType': 'Số ngày',
+      'reqValue': 14,
+      'color': Color(0xFFFDE047),
+    },
   ];
 
   bool _isElementUnlocked(Map<String, dynamic> e) {
@@ -62,9 +159,6 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     {'name': 'Sói Cô Độc', 'avatar': '🐺', 'xpOffset': 50},
     {'name': 'Gấu Bé', 'avatar': '🐻', 'xpOffset': -80},
   ];
-
-  int get _userLevel => (_userTotalXp / 500).floor() + 1;
-  int get _xpForNextLevel => _userLevel * 500;
 
   Map<String, dynamic> get _currentLeague {
     Map<String, dynamic> current = _milestoneLeagues.first;
@@ -100,13 +194,14 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     final now = DateTime.now();
     final seed = now.year * 10000 + now.month * 100 + now.day;
     final random = Random(seed);
-    
+
     List<Map<String, dynamic>> bots = _ghostProfiles.map((ghost) {
-      final dailyVar = (random.nextInt(7) - 3) * 50; // Random variance in steps of 50
+      final dailyVar =
+          (random.nextInt(7) - 3) * 50; // Random variance in steps of 50
       int botXp = _userTotalXp + (ghost['xpOffset'] as int) + dailyVar;
       if (botXp < 0) botXp = 0;
       botXp = (botXp / 50).round() * 50; // Ensure perfectly round numbers
-      
+
       return {
         'name': ghost['name'],
         'avatar': ghost['avatar'],
@@ -114,14 +209,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         'isMe': false,
       };
     }).toList();
-    
-    bots.add({
-      'name': 'Bạn',
-      'avatar': '🧑',
-      'xp': _userTotalXp,
-      'isMe': true,
-    });
-    
+
+    bots.add({'name': 'Bạn', 'avatar': '🧑', 'xp': _userTotalXp, 'isMe': true});
+
     bots.sort((a, b) => (b['xp'] as int).compareTo(a['xp'] as int));
     return bots;
   }
@@ -239,17 +329,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text(
-                      'THÀNH TỰU',
-                      style: TextStyle(
-                        color: Color(0xFF3B82F6),
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
                     SizedBox(height: 6),
                     Text(
-                      'Đại sảnh Danh vọng',
+                      'THÀNH TỰU',
                       style: TextStyle(
                         color: Color(0xFF102956),
                         fontWeight: FontWeight.w900,
@@ -258,7 +340,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'Mở khóa huy hiệu, leo hạng và trở thành nhà vô địch!',   
+                      'Mở khóa huy hiệu, leo hạng và trở thành nhà vô địch!',
                       style: TextStyle(
                         color: Color(0xFF42516E),
                         fontWeight: FontWeight.w600,
@@ -281,7 +363,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF3B82F6).withOpacity(0.12),
-                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.3)),
+                    border: Border.all(
+                      color: const Color(0xFF3B82F6).withOpacity(0.3),
+                    ),
                   ),
                   child: const Icon(
                     Icons.emoji_events_rounded,
@@ -301,8 +385,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     final current = _currentLeague;
     final next = _nextLeague;
     final leagueColor = current['color'] as Color;
-    
-    final int unlockedCount = _oasisElements.where((e) => _isElementUnlocked(e)).length;
+
+    final int unlockedCount = _oasisElements
+        .where((e) => _isElementUnlocked(e))
+        .length;
 
     return _GlassPanel(
       child: Column(
@@ -340,33 +426,34 @@ class _AchievementsScreenState extends State<AchievementsScreen>
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: leagueColor.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: leagueColor.withOpacity(0.3)),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.insights_rounded,
-                      size: 14,
-                      color: leagueColor.withOpacity(0.8),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Thành tích',
-                      style: TextStyle(
-                        color: leagueColor.withOpacity(0.9),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                child: const Text(
+                  'Thành tích Cá nhân',
+                  style: TextStyle(
+                    color: Color(0xFF42516E),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            next != null
+                ? '${_userTotalXp}/${next['xpReq']} XP để lên bậc tiếp theo'
+                : 'Bạn đã đạt cấp cao nhất!',
+            style: const TextStyle(
+              color: Color(0xFF42516E),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           ClipRRect(
@@ -423,7 +510,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           const SizedBox(height: 4),
           const Text(
             'Học bài mỗi ngày và thi đua với những người khác',
-            style: TextStyle(color: Color(0xFF42516E), fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: Color(0xFF42516E),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           ...ghosts.map((g) {
@@ -433,58 +523,67 @@ class _AchievementsScreenState extends State<AchievementsScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: isMe 
-                      ? [const Color(0xFFDBEAFE), const Color(0xFFEFF6FF)] 
-                      : [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.5)],
+                  colors: isMe
+                      ? [const Color(0xFFDBEAFE), const Color(0xFFEFF6FF)]
+                      : [
+                          Colors.white.withOpacity(0.9),
+                          Colors.white.withOpacity(0.5),
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isMe ? const Color(0xFF3B82F6).withOpacity(0.6) : Colors.white.withOpacity(0.8),
+                  color: isMe
+                      ? const Color(0xFF3B82F6).withOpacity(0.6)
+                      : Colors.white.withOpacity(0.8),
                   width: isMe ? 2 : 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: isMe ? const Color(0xFF3B82F6).withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                    color: isMe
+                        ? const Color(0xFF3B82F6).withOpacity(0.2)
+                        : Colors.black.withOpacity(0.04),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: isMe ? Colors.white : Colors.grey.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      g['avatar'],
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ),
+                  Text(g['avatar'], style: const TextStyle(fontSize: 24)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       g['name'],
                       style: TextStyle(
-                        color: isMe ? const Color(0xFF1D4ED8) : const Color(0xFF102956),
+                        color: isMe
+                            ? const Color(0xFF1D4ED8)
+                            : const Color(0xFF102956),
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFF3B82F6).withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                      color: isMe
+                          ? const Color(0xFF3B82F6).withOpacity(0.1)
+                          : Colors.grey.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${g['xp']} XP',
-                      style: TextStyle(color: isMe ? const Color(0xFF1D4ED8) : const Color(0xFF64748B), fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        color: isMe
+                            ? const Color(0xFF1D4ED8)
+                            : const Color(0xFF64748B),
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ],
@@ -497,7 +596,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   }
 
   Widget _buildOasisPanel() {
-    final unlockedElements = _oasisElements.where((e) => _isElementUnlocked(e)).toList();
+    final unlockedElements = _oasisElements
+        .where((e) => _isElementUnlocked(e))
+        .toList();
     final isBarren = unlockedElements.isEmpty;
 
     return _GlassPanel(
@@ -516,7 +617,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.amber.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -531,10 +635,13 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            isBarren 
-                ? 'Hoàn thành bộ thẻ để gieo sự sống trên đảo hoang!' 
+            isBarren
+                ? 'Hoàn thành bộ thẻ để gieo sự sống trên đảo hoang!'
                 : 'Thiên đường nhỏ từ sự nỗ lực của bạn!',
-            style: const TextStyle(color: Color(0xFF42516E), fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Color(0xFF42516E),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           ClipRRect(
@@ -557,14 +664,17 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                     animation: _ambientController,
                     builder: (context, child) {
                       return Positioned(
-                        bottom: -15 + sin(_ambientController.value * pi * 2) * 8,
+                        bottom:
+                            -15 + sin(_ambientController.value * pi * 2) * 8,
                         left: -50,
                         right: -50,
                         child: Container(
                           height: 80,
                           decoration: BoxDecoration(
                             color: Colors.lightBlueAccent.withOpacity(0.4),
-                            borderRadius: const BorderRadius.all(Radius.elliptical(500, 80)),
+                            borderRadius: const BorderRadius.all(
+                              Radius.elliptical(500, 80),
+                            ),
                           ),
                         ),
                       );
@@ -572,7 +682,8 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                   ),
                   // Sun
                   const Positioned(
-                    top: 16, right: 24,
+                    top: 16,
+                    right: 24,
                     child: Text('☀️', style: TextStyle(fontSize: 40)),
                   ),
                   // Animated clouds
@@ -582,7 +693,13 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                       return Positioned(
                         left: -30 + (_ambientController.value * 40),
                         top: 30,
-                        child: const Text('☁️', style: TextStyle(fontSize: 35, color: Color(0xFF42516E))),
+                        child: const Text(
+                          '☁️',
+                          style: TextStyle(
+                            fontSize: 35,
+                            color: Color(0xFF42516E),
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -594,11 +711,22 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                     child: Container(
                       height: 140,
                       decoration: BoxDecoration(
-                        color: isBarren ? const Color(0xFFD4A373) : const Color(0xFF4ADE80),
-                        borderRadius: const BorderRadius.all(Radius.elliptical(350, 140)),
-                        border: Border.all(color: Color(0xFF42516E).withOpacity(0.5), width: 2),
+                        color: isBarren
+                            ? const Color(0xFFD4A373)
+                            : const Color(0xFF4ADE80),
+                        borderRadius: const BorderRadius.all(
+                          Radius.elliptical(350, 140),
+                        ),
+                        border: Border.all(
+                          color: Color(0xFF42516E).withOpacity(0.5),
+                          width: 2,
+                        ),
                         boxShadow: const [
-                          BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 6))
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 12,
+                            offset: Offset(0, 6),
+                          ),
                         ],
                       ),
                     ),
@@ -606,100 +734,191 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                   // Barren Mode
                   if (isBarren)
                     Positioned(
-                      bottom: 40, left: 0, right: 0,
+                      bottom: 40,
+                      left: 0,
+                      right: 0,
                       child: Center(
                         child: Transform.scale(
                           scale: 1.5,
-                          child: const Text('🏜️', style: TextStyle(fontSize: 50)),
+                          child: const Text(
+                            '🏜️',
+                            style: TextStyle(fontSize: 50),
+                          ),
                         ),
                       ),
                     ),
                   // Organized Elements by Depth Layers
                   if (!isBarren) ...[
                     // BACK LAYER
-                    if (unlockedElements.any((e) => e['id'] == 'castle')) 
-                      const Positioned(bottom: 75, left: 0, right: 0, child: Center(child: Text('🏰', style: TextStyle(fontSize: 70)))),
-                    if (unlockedElements.any((e) => e['id'] == 'trees')) 
-                      const Positioned(bottom: 60, left: 40, child: Text('🌳', style: TextStyle(fontSize: 55))),
-                    if (unlockedElements.any((e) => e['id'] == 'household')) 
-                      const Positioned(bottom: 55, right: 50, child: Text('🍄', style: TextStyle(fontSize: 45))),
+                    if (unlockedElements.any((e) => e['id'] == 'castle'))
+                      const Positioned(
+                        bottom: 75,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Text('🏰', style: TextStyle(fontSize: 70)),
+                        ),
+                      ),
+                    if (unlockedElements.any((e) => e['id'] == 'trees'))
+                      const Positioned(
+                        bottom: 60,
+                        left: 40,
+                        child: Text('🌳', style: TextStyle(fontSize: 55)),
+                      ),
+                    if (unlockedElements.any((e) => e['id'] == 'household'))
+                      const Positioned(
+                        bottom: 55,
+                        right: 50,
+                        child: Text('🍄', style: TextStyle(fontSize: 45)),
+                      ),
                     if (unlockedElements.any((e) => e['id'] == 'animals')) ...[
-                      const Positioned(bottom: 40, right: 110, child: Text('🦌', style: TextStyle(fontSize: 35))),
+                      const Positioned(
+                        bottom: 40,
+                        right: 110,
+                        child: Text('🦌', style: TextStyle(fontSize: 35)),
+                      ),
                       AnimatedBuilder(
                         animation: _ambientController,
                         builder: (context, child) {
                           return Positioned(
-                            bottom: 80 + sin(_ambientController.value * pi * 2) * 10, 
-                            left: 80, 
-                            child: const Text('🦋', style: TextStyle(fontSize: 20))
+                            bottom:
+                                80 +
+                                sin(_ambientController.value * pi * 2) * 10,
+                            left: 80,
+                            child: const Text(
+                              '🦋',
+                              style: TextStyle(fontSize: 20),
+                            ),
                           );
-                        }
+                        },
                       ),
                     ],
-                    if (unlockedElements.any((e) => e['id'] == 'rabbit')) 
-                      const Positioned(bottom: 30, left: 80, child: Text('🐇', style: TextStyle(fontSize: 35))),
+                    if (unlockedElements.any((e) => e['id'] == 'rabbit'))
+                      const Positioned(
+                        bottom: 30,
+                        left: 80,
+                        child: Text('🐇', style: TextStyle(fontSize: 35)),
+                      ),
 
                     // FRONT LAYER
                     if (unlockedElements.any((e) => e['id'] == 'flowers')) ...[
-                      const Positioned(bottom: 15, left: 160, child: Text('🌺', style: TextStyle(fontSize: 14))),
-                      const Positioned(bottom: 35, right: 90, child: Text('🌺', style: TextStyle(fontSize: 16))),
-                      const Positioned(bottom: 20, left: 60, child: Text('🌼', style: TextStyle(fontSize: 14))),
-                      const Positioned(bottom: 8, right: 45, child: Text('🌻', style: TextStyle(fontSize: 14))),
+                      const Positioned(
+                        bottom: 15,
+                        left: 160,
+                        child: Text('🌺', style: TextStyle(fontSize: 14)),
+                      ),
+                      const Positioned(
+                        bottom: 35,
+                        right: 90,
+                        child: Text('🌺', style: TextStyle(fontSize: 16)),
+                      ),
+                      const Positioned(
+                        bottom: 20,
+                        left: 60,
+                        child: Text('🌼', style: TextStyle(fontSize: 14)),
+                      ),
+                      const Positioned(
+                        bottom: 8,
+                        right: 45,
+                        child: Text('🌻', style: TextStyle(fontSize: 14)),
+                      ),
                     ],
-                    if (unlockedElements.any((e) => e['id'] == 'mushrooms')) ...[
-                      const Positioned(bottom: 25, right: 60, child: Text('🌱', style: TextStyle(fontSize: 16))),
-                      const Positioned(bottom: 10, right: 120, child: Text('🌱', style: TextStyle(fontSize: 14))),
-                      const Positioned(bottom: 30, left: 90, child: Text('🌱', style: TextStyle(fontSize: 15))),
-                      const Positioned(bottom: 15, left: 50, child: Text('🌱', style: TextStyle(fontSize: 12))),
-                      const Positioned(bottom: 20, right: 20, child: Text('🌱', style: TextStyle(fontSize: 14))),
+                    if (unlockedElements.any(
+                      (e) => e['id'] == 'mushrooms',
+                    )) ...[
+                      const Positioned(
+                        bottom: 25,
+                        right: 60,
+                        child: Text('🌱', style: TextStyle(fontSize: 16)),
+                      ),
+                      const Positioned(
+                        bottom: 10,
+                        right: 120,
+                        child: Text('🌱', style: TextStyle(fontSize: 14)),
+                      ),
+                      const Positioned(
+                        bottom: 30,
+                        left: 90,
+                        child: Text('🌱', style: TextStyle(fontSize: 15)),
+                      ),
+                      const Positioned(
+                        bottom: 15,
+                        left: 50,
+                        child: Text('🌱', style: TextStyle(fontSize: 12)),
+                      ),
+                      const Positioned(
+                        bottom: 20,
+                        right: 20,
+                        child: Text('🌱', style: TextStyle(fontSize: 14)),
+                      ),
                     ],
-                    
+
                     // WATER (SHORE) LAYER
                     if (unlockedElements.any((e) => e['id'] == 'lighthouse'))
                       const Positioned(
-                        bottom: 0, 
-                        right: 20, 
-                        child: Text('🗼', style: TextStyle(fontSize: 45))
+                        bottom: 0,
+                        right: 20,
+                        child: Text('🗼', style: TextStyle(fontSize: 45)),
                       ),
                     if (unlockedElements.any((e) => e['id'] == 'tent')) ...[
-                      const Positioned(bottom: -5, left: 30, child: Text('⛺', style: TextStyle(fontSize: 40))),
+                      const Positioned(
+                        bottom: -5,
+                        left: 30,
+                        child: Text('⛺', style: TextStyle(fontSize: 40)),
+                      ),
                     ],
 
                     // SKY LAYER
-                    if (unlockedElements.any((e) => e['id'] == 'airballoon')) 
+                    if (unlockedElements.any((e) => e['id'] == 'airballoon'))
                       AnimatedBuilder(
                         animation: _ambientController,
                         builder: (context, child) {
                           return Positioned(
-                            bottom: 130 + sin(_ambientController.value * pi) * 15, 
-                            left: 20, 
-                            child: const Text('🎈', style: TextStyle(fontSize: 40))
+                            bottom:
+                                130 + sin(_ambientController.value * pi) * 15,
+                            left: 20,
+                            child: const Text(
+                              '🎈',
+                              style: TextStyle(fontSize: 40),
+                            ),
                           );
-                        }
+                        },
                       ),
-                    if (unlockedElements.any((e) => e['id'] == 'space')) 
+                    if (unlockedElements.any((e) => e['id'] == 'space'))
                       AnimatedBuilder(
                         animation: _ambientController,
                         builder: (context, child) {
                           return Positioned(
-                            top: 20 + sin(_ambientController.value * pi * 2) * 10, 
-                            right: 60, 
-                            child: const Text('🚀', style: TextStyle(fontSize: 35))
+                            top:
+                                20 +
+                                sin(_ambientController.value * pi * 2) * 10,
+                            right: 60,
+                            child: const Text(
+                              '🚀',
+                              style: TextStyle(fontSize: 35),
+                            ),
                           );
-                        }
+                        },
                       ),
-                    if (unlockedElements.any((e) => e['id'] == 'magic')) 
+                    if (unlockedElements.any((e) => e['id'] == 'magic'))
                       AnimatedBuilder(
                         animation: _ambientController,
                         builder: (context, child) {
                           return Positioned(
-                            bottom: 110 + sin(_ambientController.value * pi * 2) * 20, 
-                            left: 170 + cos(_ambientController.value * pi * 2) * 40, 
-                            child: const Text('✨', style: TextStyle(fontSize: 30))
+                            bottom:
+                                110 +
+                                sin(_ambientController.value * pi * 2) * 20,
+                            left:
+                                170 +
+                                cos(_ambientController.value * pi * 2) * 40,
+                            child: const Text(
+                              '✨',
+                              style: TextStyle(fontSize: 30),
+                            ),
                           );
-                        }
+                        },
                       ),
-                  ]
+                  ],
                 ],
               ),
             ),
@@ -719,8 +938,8 @@ class _AchievementsScreenState extends State<AchievementsScreen>
       return 0; // maintain original order otherwise
     });
 
-    List<Map<String, dynamic>> displayElements = _showAllBadges 
-        ? sortedElements 
+    List<Map<String, dynamic>> displayElements = _showAllBadges
+        ? sortedElements
         : sortedElements.where((e) => !_isElementUnlocked(e)).take(4).toList();
 
     if (displayElements.isEmpty && !_showAllBadges) {
@@ -752,7 +971,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF6EE7B7),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   minimumSize: const Size(0, 0),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -769,7 +991,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           const SizedBox(height: 4),
           const Text(
             'Hoàn thành các mốc thử thách để thêm các sinh vật và cảnh quan đến ốc đảo!',
-            style: TextStyle(color: Color(0xFF42516E), fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: Color(0xFF42516E),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           AnimatedSize(
@@ -852,25 +1077,27 @@ class _OasisItemCard extends StatelessWidget {
       duration: Duration(milliseconds: 600 + delayMs),
       curve: Curves.elasticOut,
       builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
+        return Transform.scale(scale: scale, child: child);
       },
       child: Container(
         clipBehavior: Clip.hardEdge,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: unlocked 
+            colors: unlocked
                 ? [Colors.white.withOpacity(0.95), color.withOpacity(0.05)]
-                : [Colors.white.withOpacity(0.8), Colors.white.withOpacity(0.4)],
+                : [
+                    Colors.white.withOpacity(0.8),
+                    Colors.white.withOpacity(0.4),
+                  ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: unlocked ? color.withOpacity(0.7) : Colors.white.withOpacity(0.6),
+            color: unlocked
+                ? color.withOpacity(0.7)
+                : Colors.white.withOpacity(0.6),
             width: 1.5,
           ),
           boxShadow: [
@@ -901,88 +1128,94 @@ class _OasisItemCard extends StatelessWidget {
               ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: background,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      iconStr,
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: unlocked ? null : Color(0xFF42516E).withOpacity(0.5),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: background,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          iconStr,
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: unlocked
+                                ? null
+                                : Color(0xFF42516E).withOpacity(0.5),
+                          ),
+                        ),
                       ),
                     ),
+                    const Spacer(),
+                    Icon(
+                      unlocked ? Icons.verified_rounded : Icons.lock_rounded,
+                      color: unlocked
+                          ? const Color(0xFF6EE7B7)
+                          : Color(0xFF42516E).withOpacity(0.5),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: unlocked ? Color(0xFF0B1C3D) : Color(0xFF42516E),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  desc,
+                  style: TextStyle(
+                    color: Color(0xFF0B1C3D).withOpacity(0.6),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const Spacer(),
-                Icon(
-                  unlocked ? Icons.verified_rounded : Icons.lock_rounded,
-                  color: unlocked ? const Color(0xFF6EE7B7) : Color(0xFF42516E).withOpacity(0.5),
-                ),
+                if (!unlocked)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: (currentProgress / reqXp).clamp(0.0, 1.0),
+                            minHeight: 6,
+                            backgroundColor: color.withOpacity(0.15),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              color.withOpacity(0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${currentProgress > reqXp ? reqXp : currentProgress}/$reqXp',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF42516E).withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: unlocked ? Color(0xFF0B1C3D) : Color(0xFF42516E),
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              desc,
-              style: TextStyle(
-                color: Color(0xFF0B1C3D).withOpacity(0.6),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                height: 1.2,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const Spacer(),
-            if (!unlocked)
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: (currentProgress / reqXp).clamp(0.0, 1.0),
-                        minHeight: 6,
-                        backgroundColor: color.withOpacity(0.15),
-                        valueColor: AlwaysStoppedAnimation<Color>(color.withOpacity(0.5)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${currentProgress > reqXp ? reqXp : currentProgress}/$reqXp',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF42516E).withOpacity(0.6),
-                    ),
-                  ),
-                ],
-              ),
           ],
         ),
-      ],
-    ),
-  ),
-);
+      ),
+    );
   }
 }
 
@@ -1039,7 +1272,10 @@ class _QuickStat extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.5)],
+            colors: [
+              Colors.white.withOpacity(0.9),
+              Colors.white.withOpacity(0.5),
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -1050,7 +1286,7 @@ class _QuickStat extends StatelessWidget {
               color: color.withOpacity(0.12),
               blurRadius: 10,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: Stack(
@@ -1058,10 +1294,10 @@ class _QuickStat extends StatelessWidget {
           children: [
             Positioned(
               right: -12,
-              top: -8,
+              bottom: -12,
               child: Transform.rotate(
-                angle: 0.15,
-                child: Icon(icon, size: 65, color: color.withOpacity(0.12)),
+                angle: -0.2,
+                child: Icon(icon, size: 70, color: color.withOpacity(0.12)),
               ),
             ),
             Row(
@@ -1076,7 +1312,7 @@ class _QuickStat extends StatelessWidget {
                         color: color.withOpacity(0.15),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
-                      )
+                      ),
                     ],
                   ),
                   child: Icon(icon, color: color, size: 22),
@@ -1161,5 +1397,3 @@ class _AmbientOrb extends StatelessWidget {
     );
   }
 }
-
-

@@ -57,67 +57,95 @@ class CustomBottomNavBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: IconButton(
-              icon: Icon(
-                Icons.home,
-                color: currentIndex == 0
-                    ? Colors.blue
-                    : const Color.fromARGB(255, 47, 34, 34),
-              ),
-              onPressed: () => onTap(0),
+            child: _NavIconItem(
+              icon: Icons.home,
+              color: currentIndex == 0
+                  ? Colors.blue
+                  : const Color.fromARGB(255, 47, 34, 34),
               tooltip: 'Trang chủ',
+              onTap: () => onTap(0),
             ),
           ),
           Expanded(
-            child: IconButton(
-              icon: Icon(
-                Icons.calendar_today,
-                color: currentIndex == 1
-                    ? Colors.blue
-                    : const Color.fromARGB(255, 47, 34, 34),
-              ),
-              onPressed: () => onTap(1),
+            child: _NavIconItem(
+              icon: Icons.calendar_today,
+              color: currentIndex == 1
+                  ? Colors.blue
+                  : const Color.fromARGB(255, 47, 34, 34),
               tooltip: 'Lịch',
+              onTap: () => onTap(1),
             ),
           ),
           const SizedBox(width: 00), // khoảng trống cho nút chụp ảnh
           Expanded(
-            child: IconButton(
-              icon: Icon(
-                Icons.menu_book,
-                color: currentIndex == 2
-                    ? Colors.blue
-                    : const Color.fromARGB(255, 47, 34, 34),
-              ),
-              onPressed: () => onTap(2),
+            child: _NavIconItem(
+              icon: Icons.menu_book,
+              color: currentIndex == 2
+                  ? Colors.blue
+                  : const Color.fromARGB(255, 47, 34, 34),
               tooltip: 'Từ điển',
+              onTap: () => onTap(2),
             ),
           ),
           Expanded(
-            child: IconButton(
-              icon: Icon(
-                Icons.style,
-                color: currentIndex == 3
-                    ? Colors.blue
-                    : const Color.fromARGB(255, 58, 53, 53),
-              ),
-              onPressed: () => onTap(3),
-              tooltip: 'Ôn Tập',
+            child: _NavIconItem(
+              icon: Icons.style,
+              color: currentIndex == 3
+                  ? Colors.blue
+                  : const Color.fromARGB(255, 58, 53, 53),
+              tooltip: 'Ôn tập',
+              onTap: () => onTap(3),
             ),
           ),
           Expanded(
-            child: IconButton(
-              icon: Icon(
-                Icons.emoji_events,
-                color: currentIndex == 4
-                    ? Colors.blue
-                    : const Color.fromARGB(255, 47, 34, 34),
-              ),
-              onPressed: () => onTap(4),
-              tooltip: 'Thành tựu',
+            child: _NavIconItem(
+              icon: Icons.emoji_events,
+              color: currentIndex == 4
+                  ? Colors.blue
+                  : const Color.fromARGB(255, 47, 34, 34),
+              tooltip: 'Thành tích',
+              onTap: () => onTap(4),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NavIconItem extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _NavIconItem({
+    required this.icon,
+    required this.color,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        label: tooltip,
+        button: true,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            splashColor: Colors.black12,
+            highlightColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            child: SizedBox(
+              height: 48,
+              child: Center(child: Icon(icon, color: color)),
+            ),
+          ),
+        ),
       ),
     );
   }

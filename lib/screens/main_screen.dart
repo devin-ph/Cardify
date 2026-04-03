@@ -1,7 +1,5 @@
-import 'package:app_btl/screens/deck_list_screen.dart';
+import 'package:cardify_ai_english_learning_app/screens/deck_list_screen.dart';
 import 'package:flutter/material.dart';
-import '../models/analysis_result.dart';
-import '../services/saved_cards_repository.dart';
 import '../widgets/ai_voice_chat_dialog.dart';
 import '../widgets/profile_icon.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
@@ -21,17 +19,13 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  int _previousIndex = 0;
   final String _userName = 'Explorer';
-  final String _userEmail = 'explorer.cardify@example.com';
-  final SavedCardsRepository _cardsRepository = SavedCardsRepository.instance;
 
   void _setScreenIndex(int index) {
     if (_currentIndex == index) {
       return;
     }
     setState(() {
-      _previousIndex = _currentIndex;
       _currentIndex = index;
     });
   }
@@ -44,21 +38,10 @@ class _MainScreenState extends State<MainScreen> {
     _setScreenIndex(-1); // Special index for camera
   }
 
-  void _onDrawerNavTap(int index) {
-    Navigator.of(context).pop();
-    if (index == -1) {
-      _onCameraTap();
-      return;
-    }
-    _onNavTap(index);
-  }
-
   void _onProfileTap() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const ProfileScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const ProfileScreen()));
   }
 
   void _onChatTap() {
@@ -66,129 +49,6 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (context) => const AiVoiceChatDialog(),
     );
-  }
-
-  Future<List<String>> _showChatVocabularySaveDialog(
-    List<ChatVocabularyCandidate> candidates,
-  ) async {
-    final pending = List<ChatVocabularyCandidate>.from(candidates);
-    final savedWords = <String>[];
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            Future<void> saveOne(ChatVocabularyCandidate candidate) async {
-              final normalized = candidate.normalizedWord;
-              final existing = await _cardsRepository.findExistingWord(
-                normalized,
-              );
-              if (existing == null) {
-                final analysis = AnalysisResult(
-                  topic: candidate.topic,
-                  word: candidate.word,
-                  phonetic: candidate.phonetic,
-                  vietnameseMeaning: candidate.vietnameseMeaning,
-                  wordType: candidate.intentType,
-                  exampleSentence: candidate.exampleSentence,
-                  pronunciationGuide: candidate.pronunciationGuide,
-                );
-                await _cardsRepository.saveResult(analysis, null);
-                savedWords.add(candidate.word);
-              }
-
-              if (!mounted) {
-                return;
-              }
-
-              setModalState(() {
-                pending.removeWhere(
-                  (item) => item.normalizedWord == candidate.normalizedWord,
-                );
-              });
-
-              if (pending.isEmpty && Navigator.of(dialogContext).canPop()) {
-                Navigator.of(dialogContext).pop();
-              }
-            }
-
-            Future<void> saveAll() async {
-              final toSave = List<ChatVocabularyCandidate>.from(pending);
-              for (final item in toSave) {
-                await saveOne(item);
-              }
-              if (Navigator.of(dialogContext).canPop()) {
-                Navigator.of(dialogContext).pop();
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Từ phát hiện trong đoạn chat'),
-              content: SizedBox(
-                width: 420,
-                child: pending.isEmpty
-                    ? const Text('Không còn từ nào cần lưu.')
-                    : ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: pending.length,
-                        separatorBuilder: (_, __) => const Divider(height: 16),
-                        itemBuilder: (context, index) {
-                          final item = pending[index];
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.word,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(item.vietnameseMeaning),
-                                    if (item.phonetic.isNotEmpty)
-                                      Text(
-                                        item.phonetic,
-                                        style: const TextStyle(
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              FilledButton(
-                                onPressed: () => saveOne(item),
-                                child: const Text('Lưu'),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Thoát'),
-                ),
-                if (pending.isNotEmpty)
-                  FilledButton(
-                    onPressed: saveAll,
-                    child: const Text('Lưu tất cả'),
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    return savedWords;
   }
 
   Widget _getBody() {
@@ -226,35 +86,35 @@ class _MainScreenState extends State<MainScreen> {
         title: const Text('AI English Learning'),
         centerTitle: true,
         elevation: 0,
-        actions: [
-          ProfileIcon(onTap: _onProfileTap),
+        actions: [ProfileIcon(onTap: _onProfileTap)],
+      ),
+      body: Stack(
+        children: [
+          _getBody(),
+          Positioned(
+            right: 16,
+            bottom: 92,
+            child: FloatingActionButton(
+              heroTag: 'ai_chat_fab',
+              mini: true,
+              onPressed: _onChatTap,
+              tooltip: 'Chat với AI',
+              child: const Icon(Icons.chat_bubble),
+            ),
+          ),
         ],
       ),
-        body: Stack(
-          children: [
-            _getBody(),
-            Positioned(
-              right: 16,
-              bottom: 92,
+      floatingActionButton: _currentIndex == 3
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 28.0),
               child: FloatingActionButton(
-                heroTag: 'ai_chat_fab',
-                mini: true,
-                onPressed: _onChatTap,
-                tooltip: 'Chat với AI',
-                child: const Icon(Icons.chat_bubble),
+                onPressed: _onCameraTap,
+                child: const Icon(Icons.camera_alt),
+                tooltip: 'Chụp ảnh',
               ),
             ),
-          ],
-        ),
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 28.0),
-          child: FloatingActionButton(
-            onPressed: _onCameraTap,
-            child: const Icon(Icons.camera_alt),
-            tooltip: 'Chụp ảnh',
-          ),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: _currentIndex < 0 ? 0 : _currentIndex,
         onTap: _onNavTap,
@@ -264,63 +124,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-class _DrawerNavTile extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _DrawerNavTile({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: const Color(0xFF66D8FF), size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: Colors.white54),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-enum _ProfileMenuAction {
-  profile,
-  settings,
-  logout,
-}
+enum _ProfileMenuAction { profile, settings, logout }
 
 class _AnimatedProfileDrawer extends StatefulWidget {
   final String userName;
@@ -337,7 +141,8 @@ class _AnimatedProfileDrawer extends StatefulWidget {
   State<_AnimatedProfileDrawer> createState() => _AnimatedProfileDrawerState();
 }
 
-class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with SingleTickerProviderStateMixin {
+class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
@@ -349,14 +154,12 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    
-    _slideAnimation = Tween<double>(begin: 300.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-    
+
+    _slideAnimation = Tween<double>(
+      begin: 300.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -383,7 +186,9 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isDestructive ? Colors.red.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+          color: isDestructive
+              ? Colors.red.withOpacity(0.1)
+              : Colors.blue.withOpacity(0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
@@ -430,7 +235,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                   Container(
+                  Container(
                     width: 40,
                     height: 5,
                     decoration: BoxDecoration(
@@ -443,7 +248,9 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                     radius: 40,
                     backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.1),
                     child: Text(
-                      widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
+                      widget.userName.isNotEmpty
+                          ? widget.userName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -463,10 +270,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                   const SizedBox(height: 4),
                   Text(
                     widget.userEmail,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 32),
                   Container(
@@ -499,7 +303,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                   ),
                   const SizedBox(height: 16),
                   Container(
-                     decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                       color: Colors.red[50],
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.red[100]!),

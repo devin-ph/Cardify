@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'analysis_result.dart';
 
@@ -64,6 +65,16 @@ class SavedCard {
         .trim()
         .toLowerCase();
 
+    Uint8List? restoredImageBytes;
+    final imageBase64Raw = data['image_bytes_base64']?.toString();
+    if (imageBase64Raw != null && imageBase64Raw.trim().isNotEmpty) {
+      try {
+        restoredImageBytes = base64Decode(imageBase64Raw.trim());
+      } catch (_) {
+        restoredImageBytes = null;
+      }
+    }
+
     return SavedCard(
       id: normalizedId.isEmpty
           ? DateTime.now().millisecondsSinceEpoch.toString()
@@ -74,7 +85,7 @@ class SavedCard {
       meaning: data['meaning']?.toString() ?? '',
       example: data['example']?.toString() ?? '',
       wordType: data['word_type']?.toString(),
-      imageBytes: null,
+      imageBytes: restoredImageBytes,
       imageUrl: data['image_url']?.toString(),
       savedAt: timestamp,
     );

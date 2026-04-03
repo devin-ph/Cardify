@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -24,6 +23,7 @@ class SavedCardsRepository {
       StreamController<List<SavedCard>>.broadcast();
   StreamSubscription<List<Map<String, dynamic>>>? _remoteSubscription;
   bool _watchingCards = false;
+  String? _watchingScope;
   bool _localStateLoaded = false;
   String? _loadedScope;
 
@@ -32,7 +32,22 @@ class SavedCardsRepository {
 
   SupabaseClient? get _clientOrNull {
     try {
-      return Supabase.instance.client;
+      final configuredUrl = dotenv.maybeGet('SUPABASE_URL')?.trim() ?? '';
+      final configuredKey = dotenv.maybeGet('SUPABASE_ANON_KEY')?.trim() ?? '';
+      if (configuredUrl.isEmpty ||
+          configuredKey.isEmpty ||
+          configuredUrl == 'https://example.supabase.co' ||
+          configuredKey == 'example-key') {
+        return null;
+      }
+
+      final client = Supabase.instance.client;
+      final url = client.rest.url.toString();
+      final isPlaceholderUrl = url.contains('example.supabase.co');
+      if (isPlaceholderUrl) {
+        return null;
+      }
+      return client;
     } catch (_) {
       return null;
     }
@@ -50,7 +65,7 @@ class SavedCardsRepository {
   }
 
   String _storageScope() {
-    final userId = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
     return (userId == null || userId.isEmpty) ? 'anonymous' : userId;
   }
 
@@ -163,6 +178,11 @@ class SavedCardsRepository {
   }
 
   Map<String, dynamic> _cardToMap(SavedCard card) {
+    final encodedImage =
+        (card.imageBytes != null && card.imageBytes!.isNotEmpty)
+        ? base64Encode(card.imageBytes!)
+        : null;
+
     return {
       'id': card.id,
       'topic': card.topic,
@@ -171,6 +191,7 @@ class SavedCardsRepository {
       'meaning': card.meaning,
       'example': card.example,
       'word_type': card.wordType,
+      if (encodedImage != null) 'image_bytes_base64': encodedImage,
       'image_url': card.imageUrl,
       'saved_at': card.savedAt.toIso8601String(),
     };
@@ -284,7 +305,7 @@ class SavedCardsRepository {
           .limit(1)
           .maybeSingle();
       return row == null ? null : row['word']?.toString();
-    } on PostgrestException {
+    } catch (_) {
       return null;
     }
   }
@@ -322,10 +343,8 @@ class SavedCardsRepository {
           'image_url': imageUrl,
           'saved_at': timestamp.toIso8601String(),
         });
-      } on StorageException catch (error) {
-        throw Exception('Lỗi tải ảnh lên Supabase: ${error.message}');
-      } on PostgrestException catch (error) {
-        throw Exception('Lỗi lưu dữ liệu Supabase: ${error.message}');
+      } catch (_) {
+        // Keep going with local persistence if remote storage is unavailable.
       }
     }
 
@@ -346,6 +365,7 @@ class SavedCardsRepository {
     String example = '',
     String topic = 'Từ mới',
     String? wordType,
+    Uint8List? imageBytes,
   }) async {
     final normalized = word.trim().toLowerCase();
     if (normalized.isEmpty) {
@@ -360,6 +380,17 @@ class SavedCardsRepository {
       throw Exception('Từ này đã có trong danh sách');
     }
 
+    final client = _clientOrNull;
+    String? imageUrl;
+
+    if (client != null && imageBytes != null && imageBytes.isNotEmpty) {
+      try {
+        imageUrl = await _uploadImage(client, imageBytes, normalized);
+      } catch (_) {
+        imageUrl = null;
+      }
+    }
+
     final card = SavedCard(
       id: normalized,
       topic: topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
@@ -368,12 +399,11 @@ class SavedCardsRepository {
       meaning: meaning.trim(),
       example: example.trim(),
       wordType: wordType?.trim().isEmpty == true ? null : wordType?.trim(),
-      imageBytes: null,
-      imageUrl: null,
+      imageBytes: imageBytes,
+      imageUrl: imageUrl,
       savedAt: DateTime.now(),
     );
 
-    final client = _clientOrNull;
     if (client != null) {
       try {
         await client.from(_tableName).insert({
@@ -383,13 +413,117 @@ class SavedCardsRepository {
           'meaning': card.meaning,
           'word_type': card.wordType,
           'example': card.example,
-          'image_url': null,
+          'image_url': card.imageUrl,
           'saved_at': card.savedAt.toIso8601String(),
         });
-      } on PostgrestException catch (error) {
-        throw Exception('Lỗi lưu từ mới lên Supabase: ${error.message}');
+      } catch (_) {
+        // Ignore remote failures; local save still succeeds.
       }
     }
+
+    _upsertLocalCard(card);
+    return card;
+  }
+
+  Future<SavedCard> upsertManualCardFromReview({
+    required String word,
+    required String meaning,
+    required String topic,
+    String phonetic = '',
+    String example = '',
+    String? wordType,
+    Uint8List? imageBytes,
+    String? existingImageUrl,
+    bool removeImage = false,
+  }) async {
+    final normalized = word.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      throw Exception('Vui lòng nhập từ mới');
+    }
+    if (meaning.trim().isEmpty) {
+      throw Exception('Vui lòng nhập nghĩa tiếng Việt');
+    }
+
+    final existingWord = await findExistingWord(normalized);
+    final client = _clientOrNull;
+    final timestamp = DateTime.now();
+    var imageUrl = existingImageUrl?.trim();
+    if (imageUrl != null && imageUrl.isEmpty) {
+      imageUrl = null;
+    }
+
+    if (removeImage) {
+      imageBytes = null;
+      imageUrl = null;
+    }
+
+    if (client != null &&
+        !removeImage &&
+        imageBytes != null &&
+        imageBytes.isNotEmpty) {
+      try {
+        imageUrl = await _uploadImage(client, imageBytes, normalized);
+      } catch (_) {
+        imageUrl = null;
+      }
+    }
+
+    if (client != null) {
+      final payload = {
+        'word': word.trim(),
+        'topic': topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
+        'phonetic': phonetic.trim(),
+        'meaning': meaning.trim(),
+        'word_type': wordType,
+        'example': example.trim(),
+        if (removeImage) 'image_url': null,
+        if (imageUrl != null) 'image_url': imageUrl,
+        'saved_at': timestamp.toIso8601String(),
+      };
+
+      try {
+        if (existingWord != null) {
+          await client
+              .from(_tableName)
+              .update(payload)
+              .ilike('word', normalized);
+        } else {
+          await client.from(_tableName).insert(payload);
+        }
+      } catch (_) {
+        if (existingWord != null) {
+          try {
+            await client
+                .from(_tableName)
+                .update(payload)
+                .ilike('word', normalized);
+          } catch (_) {
+            // Ignore remote issues and keep the local save.
+          }
+        }
+      }
+    }
+
+    final localExistingIndex = _cards.indexWhere(
+      (item) => item.id == normalized,
+    );
+    final localExisting = localExistingIndex >= 0
+        ? _cards[localExistingIndex]
+        : null;
+    final card = SavedCard(
+      id: normalized,
+      topic: topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
+      word: word.trim(),
+      phonetic: phonetic.trim(),
+      meaning: meaning.trim(),
+      example: example.trim(),
+      wordType: wordType?.trim().isEmpty == true ? null : wordType?.trim(),
+      imageBytes: removeImage
+          ? null
+          : (imageBytes ?? localExisting?.imageBytes),
+      imageUrl: removeImage ? null : (imageUrl ?? localExisting?.imageUrl),
+      savedAt: timestamp,
+    );
 
     _upsertLocalCard(card);
     return card;
@@ -433,10 +567,8 @@ class SavedCardsRepository {
         if (updatedRow == null) {
           throw Exception('Khong tim thay tu can cap nhat trong Supabase');
         }
-      } on StorageException catch (error) {
-        throw Exception('Loi tai anh len Supabase: ${error.message}');
-      } on PostgrestException catch (error) {
-        throw Exception('Loi cap nhat du lieu Supabase: ${error.message}');
+      } catch (_) {
+        // Remote update is optional.
       }
     }
 
@@ -472,11 +604,25 @@ class SavedCardsRepository {
   }
 
   Stream<List<SavedCard>> watchCards() {
-    if (_watchingCards) {
+    final scope = _storageScope();
+
+    if (_watchingCards && _watchingScope == scope) {
       return _cardsController.stream;
     }
 
+    if (_watchingCards && _watchingScope != scope) {
+      _remoteSubscription?.cancel();
+      _remoteSubscription = null;
+      _cards.clear();
+      _knownWordsByTopic.clear();
+      _watchingCards = false;
+      _localStateLoaded = false;
+      _loadedScope = null;
+      _publishCards();
+    }
+
     _watchingCards = true;
+    _watchingScope = scope;
     unawaited(_loadLocalState());
 
     final client = _clientOrNull;

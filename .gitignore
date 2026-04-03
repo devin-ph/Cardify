@@ -2,11 +2,11 @@
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+<<<<<<< HEAD
 .packages
 .pub/
 build/
 
-<<<<<<<<< Temporary merge branch 1
 # IntelliJ / Android Studio related
 *.iml
 *.ipr
@@ -27,13 +27,13 @@ build/
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+=======
+>>>>>>> 2a3f4985a9baac7e17822a0598e1de0f7601729f
 .pub-cache/
 .pub/
 build/
-/build/
-**/build/
-/coverage/
 
+<<<<<<< HEAD
 # Key & Env (Bảo mật)
 .env
 *.jks
@@ -48,7 +48,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-=========
 # Flutter generated files
 **/ios/Flutter/Generated.xcconfig
 **/ios/Flutter/flutter_export_environment.sh
@@ -58,42 +57,30 @@ app.*.map.json
 ios/Pods/
 
 # Generated files
+=======
+# Generated files (Cực kỳ quan trọng để tránh conflict nhóm)
+**/pubspec.lock
+**/generated_plugin_registrant.*
+**/generated_plugins.*
+>>>>>>> 2a3f4985a9baac7e17822a0598e1de0f7601729f
 **/GeneratedPluginRegistrant.*
 **/*.g.dart
+**/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
 
-# Xcode
-DerivedData/
-*.xcuserstate
-*.xcuserdata
-*.xcworkspace
-!ios/Runner.xcworkspace
-
-# Android
-android/.gradle/
-android/local.properties
-android/**/build/
-
-# Gradle
-.gradle/
-
-# IntelliJ / Android Studio
+# IDEs
 .idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
+.gradle/
+local.properties
 
-# VS Code
-.vscode/
-
-# Python
-__pycache__/
-*.pyc
-
-# OS
+# OS & Logs
 .DS_Store
 Thumbs.db
-
-# Logs, temp
 *.log
 *.tmp
 *.swp
@@ -104,9 +91,14 @@ reports/
 
 # Env
 .env
-
+*./**generated_plugin_registrant.cc
+*./**generated_plugin_registrant.h
+*./**generated_plugins.cmake
+*./**GeneratedPluginRegistrant.swift
 # Misc
 *.class
 migrate_working_dir/
 **/ephemeral/
->>>>>>>>> Temporary merge branch 2
+# Linux generated (Flutter)
+linux/flutter/generated_*
+windows/flutter/generated_*
