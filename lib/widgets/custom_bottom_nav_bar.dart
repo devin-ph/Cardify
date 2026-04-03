@@ -14,28 +14,20 @@ class UpwardNotchedShape extends NotchedShape {
     final s1 = 7.0;
     final s2 = 6.0;
     final r = notchRadius;
-    final a = notchHeight+3; // notch nhích lên trên
+    final a = notchHeight + 3; // notch nhích lên trên
     final b = guest.center.dx;
     final t = host.top;
     final l = host.left;
     final rHost = host.right;
     final bHost = host.bottom;
-  
+
     final path = Path();
     path.moveTo(l, t);
     // Đoạn bên trái đến notch
     path.lineTo(b - r - s1, t);
     // Bézier lên trên tạo notch
-    path.cubicTo(
-      b - r - s2, t,
-      b - r, t + a,
-      b, t + a,
-    );
-    path.cubicTo(
-      b + r, t + a,
-      b + r + s2, t,
-      b + r + s1, t,
-    );
+    path.cubicTo(b - r - s2, t, b - r, t + a, b, t + a);
+    path.cubicTo(b + r, t + a, b + r + s2, t, b + r + s1, t);
     // Đoạn bên phải notch
     path.lineTo(rHost, t);
     path.lineTo(rHost, bHost);
@@ -61,14 +53,16 @@ class CustomBottomNavBar extends StatelessWidget {
     return BottomAppBar(
       shape: UpwardNotchedShape(notchHeight: 18), // notch nhích lên trên
       notchMargin: 0.0,
-      color:  Color.fromARGB(255, 255, 243, 255),
+      color: Color.fromARGB(255, 255, 243, 255),
       child: Row(
         children: [
           Expanded(
             child: IconButton(
               icon: Icon(
                 Icons.home,
-                color: currentIndex == 0 ? Colors.blue :const Color.fromARGB(255, 47, 34, 34),
+                color: currentIndex == 0
+                    ? Colors.blue
+                    : const Color.fromARGB(255, 47, 34, 34),
               ),
               onPressed: () => onTap(0),
               tooltip: 'Trang chủ',
@@ -78,18 +72,22 @@ class CustomBottomNavBar extends StatelessWidget {
             child: IconButton(
               icon: Icon(
                 Icons.calendar_today,
-                color: currentIndex == 1 ? Colors.blue :const Color.fromARGB(255, 47, 34, 34),
+                color: currentIndex == 1
+                    ? Colors.blue
+                    : const Color.fromARGB(255, 47, 34, 34),
               ),
               onPressed: () => onTap(1),
               tooltip: 'Lịch',
             ),
           ),
-          const SizedBox(width:00), // khoảng trống cho nút chụp ảnh
+          const SizedBox(width: 00), // khoảng trống cho nút chụp ảnh
           Expanded(
             child: IconButton(
               icon: Icon(
                 Icons.menu_book,
-                color: currentIndex == 2 ? Colors.blue :const Color.fromARGB(255, 47, 34, 34),
+                color: currentIndex == 2
+                    ? Colors.blue
+                    : const Color.fromARGB(255, 47, 34, 34),
               ),
               onPressed: () => onTap(2),
               tooltip: 'Từ điển',
@@ -99,17 +97,21 @@ class CustomBottomNavBar extends StatelessWidget {
             child: IconButton(
               icon: Icon(
                 Icons.style,
-                color: currentIndex == 3 ? Colors.blue : const Color.fromARGB(255, 58, 53, 53),
+                color: currentIndex == 3
+                    ? Colors.blue
+                    : const Color.fromARGB(255, 58, 53, 53),
               ),
               onPressed: () => onTap(3),
-              tooltip: 'Flashcard',
+              tooltip: 'Ôn Tập',
             ),
           ),
           Expanded(
             child: IconButton(
               icon: Icon(
                 Icons.emoji_events,
-                color: currentIndex == 4 ? Colors.blue :const Color.fromARGB(255, 47, 34, 34),
+                color: currentIndex == 4
+                    ? Colors.blue
+                    : const Color.fromARGB(255, 47, 34, 34),
               ),
               onPressed: () => onTap(4),
               tooltip: 'Thành tựu',

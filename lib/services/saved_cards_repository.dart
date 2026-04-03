@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/analysis_result.dart';
@@ -12,15 +17,252 @@ class SavedCardsRepository {
   static final SavedCardsRepository instance = SavedCardsRepository._();
 
   final List<SavedCard> _cards = [];
-  SupabaseClient get _client => Supabase.instance.client;
+  final Map<String, Set<String>> _knownWordsByTopic = <String, Set<String>>{};
+  final ValueNotifier<List<SavedCard>> cardsNotifier =
+      ValueNotifier<List<SavedCard>>(const <SavedCard>[]);
+  final StreamController<List<SavedCard>> _cardsController =
+      StreamController<List<SavedCard>>.broadcast();
+  StreamSubscription<List<Map<String, dynamic>>>? _remoteSubscription;
+  bool _watchingCards = false;
+  bool _localStateLoaded = false;
+  String? _loadedScope;
 
-  String get _bucketName => dotenv.maybeGet('SUPABASE_BUCKET') ?? 'btl';
-  String get _tableName => dotenv.maybeGet('SUPABASE_TABLE') ?? 'flashcards';
+  static const String _localCardsKey = 'saved_cards_local_json';
+  static const String _localKnownWordsKey = 'known_words_local_json';
+
+  SupabaseClient? get _clientOrNull {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String get _bucketName => _dotenvValue('SUPABASE_BUCKET', 'btl');
+  String get _tableName => _dotenvValue('SUPABASE_TABLE', 'flashcards');
+
+  String _dotenvValue(String key, String fallback) {
+    try {
+      return dotenv.maybeGet(key) ?? fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  String _storageScope() {
+    final userId = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+    return (userId == null || userId.isEmpty) ? 'anonymous' : userId;
+  }
 
   List<SavedCard> get cards => List.unmodifiable(_cards);
 
   bool containsWord(String normalizedWord) {
     return _cards.any((card) => card.id == normalizedWord);
+  }
+
+  Set<String> _knownWordsForTopic(String topic) {
+    return _knownWordsByTopic.putIfAbsent(topic.trim(), () => <String>{});
+  }
+
+  bool isKnown(String normalizedWord, {String? topic}) {
+    final key = normalizedWord.trim().toLowerCase();
+    if (key.isEmpty) {
+      return false;
+    }
+
+    if (topic != null && topic.trim().isNotEmpty) {
+      return _knownWordsForTopic(topic).contains(key);
+    }
+
+    return _knownWordsByTopic.values.any(
+      (knownWords) => knownWords.contains(key),
+    );
+  }
+
+  void markKnown(String normalizedWord, {String? topic}) {
+    final key = normalizedWord.trim().toLowerCase();
+    if (key.isEmpty) {
+      return;
+    }
+
+    final topicName = topic?.trim();
+    if (topicName != null && topicName.isNotEmpty) {
+      final knownWords = _knownWordsForTopic(topicName);
+      if (!knownWords.add(key)) {
+        return;
+      }
+    } else {
+      final alreadyKnown = _knownWordsByTopic.values.any(
+        (knownWords) => knownWords.contains(key),
+      );
+      if (alreadyKnown) {
+        return;
+      }
+      _knownWordsForTopic('General').add(key);
+    }
+
+    _publishCards();
+    unawaited(_persistLocalState());
+  }
+
+  void unmarkKnown(String normalizedWord, {String? topic}) {
+    final key = normalizedWord.trim().toLowerCase();
+    if (key.isEmpty) {
+      return;
+    }
+
+    if (topic != null && topic.trim().isNotEmpty) {
+      final knownWords = _knownWordsByTopic[topic.trim()];
+      if (knownWords != null && knownWords.remove(key)) {
+        if (knownWords.isEmpty) {
+          _knownWordsByTopic.remove(topic.trim());
+        }
+        _publishCards();
+      }
+      return;
+    }
+
+    var removed = false;
+    final emptyTopics = <String>[];
+    for (final entry in _knownWordsByTopic.entries) {
+      if (entry.value.remove(key)) {
+        removed = true;
+        if (entry.value.isEmpty) {
+          emptyTopics.add(entry.key);
+        }
+      }
+    }
+    for (final topicName in emptyTopics) {
+      _knownWordsByTopic.remove(topicName);
+    }
+    if (removed) {
+      _publishCards();
+      unawaited(_persistLocalState());
+    }
+  }
+
+  int knownCountForTopic(String topic) {
+    return _knownWordsForTopic(topic).length;
+  }
+
+  int savedCountForTopic(String topic) {
+    return _cards.where((card) => card.topic == topic).length;
+  }
+
+  int totalCountForTopic(String topic, {int baseCount = 50}) {
+    final savedCount = savedCountForTopic(topic);
+    return baseCount + savedCount;
+  }
+
+  void _publishCards() {
+    final List<SavedCard> snapshot = List<SavedCard>.unmodifiable(_cards);
+    cardsNotifier.value = snapshot;
+    if (!_cardsController.isClosed) {
+      _cardsController.add(snapshot);
+    }
+  }
+
+  Map<String, dynamic> _cardToMap(SavedCard card) {
+    return {
+      'id': card.id,
+      'topic': card.topic,
+      'word': card.word,
+      'phonetic': card.phonetic,
+      'meaning': card.meaning,
+      'example': card.example,
+      'word_type': card.wordType,
+      'image_url': card.imageUrl,
+      'saved_at': card.savedAt.toIso8601String(),
+    };
+  }
+
+  String _cardsStorageKey() => '${_storageScope()}::$_localCardsKey';
+
+  String _knownWordsStorageKey() => '${_storageScope()}::$_localKnownWordsKey';
+
+  Future<void> _persistLocalState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _cardsStorageKey(),
+        jsonEncode(_cards.map(_cardToMap).toList()),
+      );
+      await prefs.setString(
+        _knownWordsStorageKey(),
+        jsonEncode(
+          _knownWordsByTopic.map(
+            (topic, words) => MapEntry(topic, words.toList()),
+          ),
+        ),
+      );
+    } catch (_) {
+      // Ignore local persistence failures so the app can keep working.
+    }
+  }
+
+  Future<void> _loadLocalState() async {
+    final scope = _storageScope();
+    if (_localStateLoaded && _loadedScope == scope) {
+      return;
+    }
+    _localStateLoaded = true;
+    _loadedScope = scope;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final cardsJson = prefs.getString(_cardsStorageKey());
+      if (cardsJson != null && cardsJson.isNotEmpty) {
+        final decoded = jsonDecode(cardsJson);
+        if (decoded is List) {
+          final localCards = decoded
+              .whereType<Map>()
+              .map(
+                (item) => SavedCard.fromMap(
+                  Map<String, dynamic>.from(item.cast<String, dynamic>()),
+                ),
+              )
+              .toList();
+          _cards
+            ..clear()
+            ..addAll(localCards);
+        }
+      }
+
+      final knownWordsJson = prefs.getString(_knownWordsStorageKey());
+      if (knownWordsJson != null && knownWordsJson.isNotEmpty) {
+        final decoded = jsonDecode(knownWordsJson);
+        if (decoded is Map) {
+          _knownWordsByTopic
+            ..clear()
+            ..addAll(
+              decoded.map(
+                (key, value) => MapEntry(
+                  key.toString(),
+                  value is List
+                      ? value.map((item) => item.toString()).toSet()
+                      : <String>{},
+                ),
+              ),
+            );
+        }
+      }
+
+      _publishCards();
+    } catch (_) {
+      // Ignore local load failures and fall back to remote/runtime state.
+    }
+  }
+
+  void _upsertLocalCard(SavedCard card) {
+    final index = _cards.indexWhere((item) => item.id == card.id);
+    if (index >= 0) {
+      _cards[index] = card;
+    } else {
+      _cards.add(card);
+    }
+    _publishCards();
+    unawaited(_persistLocalState());
   }
 
   Future<String?> findExistingWord(String normalizedWord) async {
@@ -29,8 +271,13 @@ class SavedCardsRepository {
       return localMatch.first.word;
     }
 
+    final client = _clientOrNull;
+    if (client == null) {
+      return null;
+    }
+
     try {
-      final row = await _client
+      final row = await client
           .from(_tableName)
           .select('word')
           .ilike('word', normalizedWord)
@@ -54,28 +301,32 @@ class SavedCardsRepository {
     if (existingWord != null) {
       return null;
     }
+
+    final client = _clientOrNull;
     final timestamp = DateTime.now();
     String? imageUrl;
 
-    try {
-      if (imageBytes != null && imageBytes.isNotEmpty) {
-        imageUrl = await _uploadImage(imageBytes, normalized);
-      }
+    if (client != null) {
+      try {
+        if (imageBytes != null && imageBytes.isNotEmpty) {
+          imageUrl = await _uploadImage(client, imageBytes, normalized);
+        }
 
-      await _client.from(_tableName).insert({
-        'word': result.word,
-        'topic': result.topic,
-        'phonetic': result.phonetic,
-        'meaning': result.vietnameseMeaning,
-        'word_type': result.wordType,
-        'example': result.exampleSentence,
-        'image_url': imageUrl,
-        'saved_at': timestamp.toIso8601String(),
-      });
-    } on StorageException catch (error) {
-      throw Exception('Lỗi tải ảnh lên Supabase: ${error.message}');
-    } on PostgrestException catch (error) {
-      throw Exception('Lỗi lưu dữ liệu Supabase: ${error.message}');
+        await client.from(_tableName).insert({
+          'word': result.word,
+          'topic': result.topic,
+          'phonetic': result.phonetic,
+          'meaning': result.vietnameseMeaning,
+          'word_type': result.wordType,
+          'example': result.exampleSentence,
+          'image_url': imageUrl,
+          'saved_at': timestamp.toIso8601String(),
+        });
+      } on StorageException catch (error) {
+        throw Exception('Lỗi tải ảnh lên Supabase: ${error.message}');
+      } on PostgrestException catch (error) {
+        throw Exception('Lỗi lưu dữ liệu Supabase: ${error.message}');
+      }
     }
 
     final card = SavedCard.fromAnalysisResult(
@@ -84,6 +335,62 @@ class SavedCardsRepository {
       remoteUrl: imageUrl,
       timestamp: timestamp,
     );
+    _upsertLocalCard(card);
+    return card;
+  }
+
+  Future<SavedCard> addManualCard({
+    required String word,
+    required String meaning,
+    String phonetic = '',
+    String example = '',
+    String topic = 'Từ mới',
+    String? wordType,
+  }) async {
+    final normalized = word.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      throw Exception('Vui lòng nhập từ mới');
+    }
+    if (meaning.trim().isEmpty) {
+      throw Exception('Vui lòng nhập nghĩa tiếng Việt');
+    }
+
+    final existingWord = await findExistingWord(normalized);
+    if (existingWord != null) {
+      throw Exception('Từ này đã có trong danh sách');
+    }
+
+    final card = SavedCard(
+      id: normalized,
+      topic: topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
+      word: word.trim(),
+      phonetic: phonetic.trim(),
+      meaning: meaning.trim(),
+      example: example.trim(),
+      wordType: wordType?.trim().isEmpty == true ? null : wordType?.trim(),
+      imageBytes: null,
+      imageUrl: null,
+      savedAt: DateTime.now(),
+    );
+
+    final client = _clientOrNull;
+    if (client != null) {
+      try {
+        await client.from(_tableName).insert({
+          'word': card.word,
+          'topic': card.topic,
+          'phonetic': card.phonetic,
+          'meaning': card.meaning,
+          'word_type': card.wordType,
+          'example': card.example,
+          'image_url': null,
+          'saved_at': card.savedAt.toIso8601String(),
+        });
+      } on PostgrestException catch (error) {
+        throw Exception('Lỗi lưu từ mới lên Supabase: ${error.message}');
+      }
+    }
+
     _upsertLocalCard(card);
     return card;
   }
@@ -93,37 +400,44 @@ class SavedCardsRepository {
     required AnalysisResult result,
     Uint8List? imageBytes,
   }) async {
+    final client = _clientOrNull;
     final timestamp = DateTime.now();
     String? imageUrl;
 
-    try {
-      if (imageBytes != null && imageBytes.isNotEmpty) {
-        imageUrl = await _uploadImage(imageBytes, result.normalizedWord);
-      }
+    if (client != null) {
+      try {
+        if (imageBytes != null && imageBytes.isNotEmpty) {
+          imageUrl = await _uploadImage(
+            client,
+            imageBytes,
+            result.normalizedWord,
+          );
+        }
 
-      final updatedRow = await _client
-          .from(_tableName)
-          .update({
-            'word': result.word,
-            'topic': result.topic,
-            'phonetic': result.phonetic,
-            'meaning': result.vietnameseMeaning,
-            'word_type': result.wordType,
-            'example': result.exampleSentence,
-            if (imageUrl != null) 'image_url': imageUrl,
-            'saved_at': timestamp.toIso8601String(),
-          })
-          .eq('word', existingWord)
-          .select()
-          .maybeSingle();
+        final updatedRow = await client
+            .from(_tableName)
+            .update({
+              'word': result.word,
+              'topic': result.topic,
+              'phonetic': result.phonetic,
+              'meaning': result.vietnameseMeaning,
+              'word_type': result.wordType,
+              'example': result.exampleSentence,
+              if (imageUrl != null) 'image_url': imageUrl,
+              'saved_at': timestamp.toIso8601String(),
+            })
+            .eq('word', existingWord)
+            .select()
+            .maybeSingle();
 
-      if (updatedRow == null) {
-        throw Exception('Khong tim thay tu can cap nhat trong Supabase');
+        if (updatedRow == null) {
+          throw Exception('Khong tim thay tu can cap nhat trong Supabase');
+        }
+      } on StorageException catch (error) {
+        throw Exception('Loi tai anh len Supabase: ${error.message}');
+      } on PostgrestException catch (error) {
+        throw Exception('Loi cap nhat du lieu Supabase: ${error.message}');
       }
-    } on StorageException catch (error) {
-      throw Exception('Loi tai anh len Supabase: ${error.message}');
-    } on PostgrestException catch (error) {
-      throw Exception('Loi cap nhat du lieu Supabase: ${error.message}');
     }
 
     final card = SavedCard.fromAnalysisResult(
@@ -136,20 +450,15 @@ class SavedCardsRepository {
     return card;
   }
 
-  void _upsertLocalCard(SavedCard card) {
-    final index = _cards.indexWhere((item) => item.id == card.id);
-    if (index >= 0) {
-      _cards[index] = card;
-    } else {
-      _cards.add(card);
-    }
-  }
-
-  Future<String> _uploadImage(Uint8List bytes, String normalizedWord) async {
+  Future<String> _uploadImage(
+    SupabaseClient client,
+    Uint8List bytes,
+    String normalizedWord,
+  ) async {
     final fileName =
         '${DateTime.now().millisecondsSinceEpoch}_$normalizedWord.jpg';
     final path = 'cards/$fileName';
-    await _client.storage
+    await client.storage
         .from(_bucketName)
         .uploadBinary(
           path,
@@ -159,20 +468,37 @@ class SavedCardsRepository {
             upsert: true,
           ),
         );
-    return _client.storage.from(_bucketName).getPublicUrl(path);
+    return client.storage.from(_bucketName).getPublicUrl(path);
   }
 
   Stream<List<SavedCard>> watchCards() {
-    return _client
-        .from(_tableName)
-        .stream(primaryKey: ['word'])
-        .order('saved_at', ascending: false)
-        .map((rows) {
-          final mapped = rows.map((row) => SavedCard.fromMap(row)).toList();
-          _cards
-            ..clear()
-            ..addAll(mapped);
-          return mapped;
-        });
+    if (_watchingCards) {
+      return _cardsController.stream;
+    }
+
+    _watchingCards = true;
+    unawaited(_loadLocalState());
+
+    final client = _clientOrNull;
+    if (client != null) {
+      _remoteSubscription ??= client
+          .from(_tableName)
+          .stream(primaryKey: ['word'])
+          .order('saved_at', ascending: false)
+          .listen((rows) {
+            final mapped = rows.map((row) => SavedCard.fromMap(row)).toList();
+            final merged = <String, SavedCard>{
+              for (final card in _cards) card.id: card,
+              for (final card in mapped) card.id: card,
+            };
+            _cards
+              ..clear()
+              ..addAll(merged.values.toList());
+            _publishCards();
+          });
+    }
+
+    _publishCards();
+    return _cardsController.stream;
   }
 }

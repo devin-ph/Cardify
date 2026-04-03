@@ -102,9 +102,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     final random = Random(seed);
     
     List<Map<String, dynamic>> bots = _ghostProfiles.map((ghost) {
-      final dailyVar = random.nextInt(60) - 30; // Random variance -30 to 30 XP
+      final dailyVar = (random.nextInt(7) - 3) * 50; // Random variance in steps of 50
       int botXp = _userTotalXp + (ghost['xpOffset'] as int) + dailyVar;
       if (botXp < 0) botXp = 0;
+      botXp = (botXp / 50).round() * 50; // Ensure perfectly round numbers
       
       return {
         'name': ghost['name'],
@@ -257,7 +258,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'Mở khóa huy hiệu, leo bậc xếp hạng và trở thành nhà vô địch!',   
+                      'Mở khóa huy hiệu, leo hạng và trở thành nhà vô địch!',   
                       style: TextStyle(
                         color: Color(0xFF42516E),
                         fontWeight: FontWeight.w600,
@@ -300,45 +301,72 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     final current = _currentLeague;
     final next = _nextLeague;
     final leagueColor = current['color'] as Color;
+    
+    final int unlockedCount = _oasisElements.where((e) => _isElementUnlocked(e)).length;
 
     return _GlassPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  current['name'],
-                  style: TextStyle(
-                    color: leagueColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 24,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      current['name'],
+                      style: TextStyle(
+                        color: leagueColor,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      next != null
+                          ? '${_userTotalXp}/${next['xpReq']} XP để lên bậc tiếp theo'
+                          : 'Bạn đã đạt cấp cao nhất!',
+                      style: const TextStyle(
+                        color: Color(0xFF42516E),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: leagueColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
+                  color: leagueColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: leagueColor.withOpacity(0.3)),
                 ),
-                child: const Text(
-                  'Thành tích Cá nhân',
-                  style: TextStyle(
-                    color: Color(0xFF42516E),
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.insights_rounded,
+                      size: 14,
+                      color: leagueColor.withOpacity(0.8),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Thành tích',
+                      style: TextStyle(
+                        color: leagueColor.withOpacity(0.9),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            next != null
-                ? '${_userTotalXp}/${next['xpReq']} XP để lên bậc tiếp theo'
-                : 'Bạn đã đạt cấp cao nhất!',
-            style: const TextStyle(color: Color(0xFF42516E), fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
           ClipRRect(
@@ -359,9 +387,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           Row(
             children: [
               _QuickStat(
-                icon: Icons.local_fire_department_rounded,
-                label: 'Chuỗi',
-                value: '12',
+                icon: Icons.star_rounded,
+                label: 'Thành tựu',
+                value: '$unlockedCount',
                 color: const Color(0xFFFFA94D),
               ),
               const SizedBox(width: 10),
@@ -401,20 +429,41 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           ...ghosts.map((g) {
             final isMe = g['isMe'] == true;
             return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: isMe ? const Color(0xFFE9F4FF).withOpacity(0.9) : const Color(0xFFFFFFFF).withOpacity(0.72),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isMe ? const Color(0xFF3B82F6).withOpacity(0.4) : Colors.black12,
+                gradient: LinearGradient(
+                  colors: isMe 
+                      ? [const Color(0xFFDBEAFE), const Color(0xFFEFF6FF)] 
+                      : [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.5)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isMe ? const Color(0xFF3B82F6).withOpacity(0.6) : Colors.white.withOpacity(0.8),
+                  width: isMe ? 2 : 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isMe ? const Color(0xFF3B82F6).withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  )
+                ],
               ),
               child: Row(
                 children: [
-                  Text(
-                    g['avatar'],
-                    style: const TextStyle(fontSize: 24),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: isMe ? Colors.white : Colors.grey.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      g['avatar'],
+                      style: const TextStyle(fontSize: 24),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -422,14 +471,21 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                       g['name'],
                       style: TextStyle(
                         color: isMe ? const Color(0xFF1D4ED8) : const Color(0xFF102956),
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),
                     ),
                   ),
-                  Text(
-                    '${g['xp']} XP',
-                    style: TextStyle(color: isMe ? const Color(0xFF1D4ED8) : const Color(0xFF42516E), fontWeight: FontWeight.w800),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isMe ? const Color(0xFF3B82F6).withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${g['xp']} XP',
+                      style: TextStyle(color: isMe ? const Color(0xFF1D4ED8) : const Color(0xFF64748B), fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ],
               ),
@@ -732,6 +788,16 @@ class _AchievementsScreenState extends State<AchievementsScreen>
               ),
               itemBuilder: (context, index) {
                 final e = displayElements[index];
+
+                int currentProgress = 0;
+                if (e['reqType'] == 'sets') {
+                  currentProgress = _userTotalSetsCompleted;
+                } else if (e['reqType'] == 'cards') {
+                  currentProgress = _userTotalCardsStudied;
+                } else if (e['reqType'] == 'Số ngày') {
+                  currentProgress = _currentStreak;
+                }
+
                 return _OasisItemCard(
                   delayMs: 120 * (index % 4),
                   title: e['name'] as String,
@@ -741,6 +807,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                   color: e['color'] as Color,
                   reqXp: e['reqValue'] as int,
                   reqType: e['reqType'] as String,
+                  currentProgress: currentProgress,
                 );
               },
             ),
@@ -760,6 +827,7 @@ class _OasisItemCard extends StatelessWidget {
   final Color color;
   final int reqXp;
   final String reqType;
+  final int currentProgress;
 
   const _OasisItemCard({
     required this.delayMs,
@@ -770,6 +838,7 @@ class _OasisItemCard extends StatelessWidget {
     required this.color,
     required this.reqXp,
     required this.reqType,
+    required this.currentProgress,
   });
 
   @override
@@ -779,29 +848,59 @@ class _OasisItemCard extends StatelessWidget {
         : Color(0xFFFFFFFF).withOpacity(0.6);
 
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: Duration(milliseconds: 540 + delayMs),
-      curve: Curves.easeOutBack,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(0, (1 - value) * 24),
-            child: child,
-          ),
+      tween: Tween<double>(begin: 0.8, end: 1.0),
+      duration: Duration(milliseconds: 600 + delayMs),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: child,
         );
       },
       child: Container(
+        clipBehavior: Clip.hardEdge,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Color(0xFFFFFFFF).withOpacity(0.72),
+          gradient: LinearGradient(
+            colors: unlocked 
+                ? [Colors.white.withOpacity(0.95), color.withOpacity(0.05)]
+                : [Colors.white.withOpacity(0.8), Colors.white.withOpacity(0.4)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: unlocked ? color.withOpacity(0.6) : Colors.black12,
+            color: unlocked ? color.withOpacity(0.7) : Colors.white.withOpacity(0.6),
+            width: 1.5,
           ),
+          boxShadow: [
+            if (unlocked)
+              BoxShadow(
+                color: color.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          children: [
+            if (unlocked)
+              Positioned(
+                right: -10,
+                bottom: -15,
+                child: Transform.rotate(
+                  angle: -0.2,
+                  child: Text(
+                    iconStr,
+                    style: TextStyle(
+                      fontSize: 65,
+                      color: Colors.white.withOpacity(0.2),
+                    ),
+                  ),
+                ),
+              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -841,23 +940,49 @@ class _OasisItemCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            Expanded(
-              child: Text(
-                desc,
-                style: TextStyle(
-                  color: Color(0xFF0B1C3D).withOpacity(0.6),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  height: 1.2,
-                ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+            Text(
+              desc,
+              style: TextStyle(
+                color: Color(0xFF0B1C3D).withOpacity(0.6),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                height: 1.2,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
+            const Spacer(),
+            if (!unlocked)
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: (currentProgress / reqXp).clamp(0.0, 1.0),
+                        minHeight: 6,
+                        backgroundColor: color.withOpacity(0.15),
+                        valueColor: AlwaysStoppedAnimation<Color>(color.withOpacity(0.5)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${currentProgress > reqXp ? reqXp : currentProgress}/$reqXp',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF42516E).withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+);
   }
 }
 
@@ -910,31 +1035,85 @@ class _QuickStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        clipBehavior: Clip.hardEdge,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Color(0xFFFFFFFF).withOpacity(0.6),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.black12),
+          gradient: LinearGradient(
+            colors: [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.5)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.9), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
-        child: Column(
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF0B1C3D),
-                fontWeight: FontWeight.w900,
-                fontSize: 17,
+            Positioned(
+              right: -12,
+              top: -8,
+              child: Transform.rotate(
+                angle: 0.15,
+                child: Icon(icon, size: 65, color: color.withOpacity(0.12)),
               ),
             ),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF42516E),
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.15),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      )
+                    ],
+                  ),
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          value,
+                          style: const TextStyle(
+                            color: Color(0xFF0B1C3D),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: color.withOpacity(0.9),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          height: 1.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
