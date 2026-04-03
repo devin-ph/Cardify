@@ -6,7 +6,6 @@
 .pub/
 build/
 
-<<<<<<<<< Temporary merge branch 1
 # IntelliJ / Android Studio related
 *.iml
 *.ipr
@@ -48,7 +47,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-=========
 # Flutter generated files
 **/ios/Flutter/Generated.xcconfig
 **/ios/Flutter/flutter_export_environment.sh
@@ -104,12 +102,13 @@ reports/
 
 # Env
 .env
-*.generated_plugin_registrant.cc
-*.generated_plugin_registrant.h
-*.generated_plugins.cmake
-**GeneratedPluginRegistrant.swift
+*./**generated_plugin_registrant.cc
+*./**generated_plugin_registrant.h
+*./**generated_plugins.cmake
+*./**GeneratedPluginRegistrant.swift
 # Misc
 *.class
 migrate_working_dir/
 **/ephemeral/
->>>>>>>>> Temporary merge branch 2
+# Linux generated (Flutter)
+linux/flutter/generated_*
