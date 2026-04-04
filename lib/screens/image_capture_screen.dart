@@ -9,6 +9,7 @@ import '../models/analysis_result.dart';
 import '../screens/dictionary_screen.dart';
 import '../services/network_service.dart';
 import '../services/saved_cards_repository.dart';
+import '../services/xp_service.dart';
 
 class ImageCaptureScreen extends StatefulWidget {
   const ImageCaptureScreen({super.key, this.onDone});
@@ -401,12 +402,15 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
         _showSnack('Thẻ đã có trong bộ sưu tập');
         return true;
       }
+
+      await XPService.instance.addXP(50);
+
       if (!mounted) {
         return true;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đã lưu "${result.word}" vào Supabase'),
+          content: Text('Đã lưu "${result.word}" vào Supabase. +50 XP!'),
           behavior: SnackBarBehavior.floating,
         ),
       );

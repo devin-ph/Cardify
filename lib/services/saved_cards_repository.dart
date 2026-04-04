@@ -266,20 +266,19 @@ class SavedCardsRepository {
   }
 
   Future<String?> findExistingWord(String normalizedWord) async {
-    final localMatch = _cards.where((card) => card.id == normalizedWord);
-    if (localMatch.isNotEmpty) {
-      return localMatch.first.word;
-    }
-
     final client = _clientOrNull;
     if (client == null) {
       return null;
     }
 
+    final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
     try {
       final row = await client
           .from(_tableName)
           .select('word')
+          .eq('user_id', uid)
           .ilike('word', normalizedWord)
           .limit(1)
           .maybeSingle();
@@ -313,6 +312,7 @@ class SavedCardsRepository {
         }
 
         await client.from(_tableName).insert({
+          'user_id': firebase_auth.FirebaseAuth.instance.currentUser?.uid,
           'word': result.word,
           'topic': result.topic,
           'phonetic': result.phonetic,
@@ -325,6 +325,11 @@ class SavedCardsRepository {
       } on StorageException catch (error) {
         throw Exception('Lỗi tải ảnh lên Supabase: ${error.message}');
       } on PostgrestException catch (error) {
+        if (error.message.toLowerCase().contains('user_id')) {
+          throw Exception(
+            'Lỗi: Bảng flashcards trong Supabase chưa có cột "user_id". Vui lòng mở Supabase và thêm cột "user_id" kiểu "text".',
+          );
+        }
         throw Exception('Lỗi lưu dữ liệu Supabase: ${error.message}');
       }
     }
@@ -377,6 +382,7 @@ class SavedCardsRepository {
     if (client != null) {
       try {
         await client.from(_tableName).insert({
+          'user_id': firebase_auth.FirebaseAuth.instance.currentUser?.uid,
           'word': card.word,
           'topic': card.topic,
           'phonetic': card.phonetic,
@@ -387,6 +393,11 @@ class SavedCardsRepository {
           'saved_at': card.savedAt.toIso8601String(),
         });
       } on PostgrestException catch (error) {
+        if (error.message.toLowerCase().contains('user_id')) {
+          throw Exception(
+            'Lỗi: Bảng flashcards trong Supabase chưa có cột "user_id". Vui lòng mở Supabase và thêm cột "user_id" kiểu "text".',
+          );
+        }
         throw Exception('Lỗi lưu từ mới lên Supabase: ${error.message}');
       }
     }
@@ -400,6 +411,9 @@ class SavedCardsRepository {
     required AnalysisResult result,
     Uint8List? imageBytes,
   }) async {
+    final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw Exception('Người dùng chưa đăng nhập');
+
     final client = _clientOrNull;
     final timestamp = DateTime.now();
     String? imageUrl;
@@ -426,6 +440,7 @@ class SavedCardsRepository {
               if (imageUrl != null) 'image_url': imageUrl,
               'saved_at': timestamp.toIso8601String(),
             })
+            .eq('user_id', uid)
             .eq('word', existingWord)
             .select()
             .maybeSingle();
@@ -486,7 +501,13 @@ class SavedCardsRepository {
           .stream(primaryKey: ['word'])
           .order('saved_at', ascending: false)
           .listen((rows) {
-            final mapped = rows.map((row) => SavedCard.fromMap(row)).toList();
+            final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+            final userRows = uid != null
+                ? rows.where((row) => row['user_id'] == uid).toList()
+                : <Map<String, dynamic>>[];
+            final mapped = userRows
+                .map((row) => SavedCard.fromMap(row))
+                .toList();
             final merged = <String, SavedCard>{
               for (final card in _cards) card.id: card,
               for (final card in mapped) card.id: card,

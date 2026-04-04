@@ -2,6 +2,7 @@ import 'package:app_btl/screens/deck_list_screen.dart';
 import 'package:flutter/material.dart';
 import '../models/analysis_result.dart';
 import '../services/saved_cards_repository.dart';
+import '../services/xp_service.dart';
 import '../widgets/ai_voice_chat_dialog.dart';
 import '../widgets/profile_icon.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
@@ -22,6 +23,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   int _previousIndex = 0;
+  bool _isDictionarySearching = false;
   final String _userName = 'Explorer';
   final String _userEmail = 'explorer.cardify@example.com';
   final SavedCardsRepository _cardsRepository = SavedCardsRepository.instance;
@@ -31,8 +33,20 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
     setState(() {
+      if (_currentIndex == 2 && index != 2) {
+        _isDictionarySearching = false;
+      }
       _previousIndex = _currentIndex;
       _currentIndex = index;
+    });
+  }
+
+  void _onDictionarySearchModeChanged(bool isSearching) {
+    if (!mounted || _isDictionarySearching == isSearching) {
+      return;
+    }
+    setState(() {
+      _isDictionarySearching = isSearching;
     });
   }
 
@@ -54,18 +68,19 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onProfileTap() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const ProfileScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const ProfileScreen()));
   }
 
-  void _onChatTap() {
-    showDialog(
+  Future<void> _onChatTap() async {
+    final result = await showDialog(
       context: context,
       builder: (context) => const AiVoiceChatDialog(),
     );
+    if (result is List<ChatVocabularyCandidate> && result.isNotEmpty) {
+      await _showChatVocabularySaveDialog(result);
+    }
   }
 
   Future<List<String>> _showChatVocabularySaveDialog(
@@ -81,36 +96,51 @@ class _MainScreenState extends State<MainScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             Future<void> saveOne(ChatVocabularyCandidate candidate) async {
-              final normalized = candidate.normalizedWord;
-              final existing = await _cardsRepository.findExistingWord(
-                normalized,
-              );
-              if (existing == null) {
-                final analysis = AnalysisResult(
-                  topic: candidate.topic,
-                  word: candidate.word,
-                  phonetic: candidate.phonetic,
-                  vietnameseMeaning: candidate.vietnameseMeaning,
-                  wordType: candidate.intentType,
-                  exampleSentence: candidate.exampleSentence,
-                  pronunciationGuide: candidate.pronunciationGuide,
+              try {
+                final normalized = candidate.normalizedWord;
+                final existing = await _cardsRepository.findExistingWord(
+                  normalized,
                 );
-                await _cardsRepository.saveResult(analysis, null);
-                savedWords.add(candidate.word);
-              }
+                if (existing == null) {
+                  final analysis = AnalysisResult(
+                    topic: candidate.topic,
+                    word: candidate.word,
+                    phonetic: candidate.phonetic,
+                    vietnameseMeaning: candidate.vietnameseMeaning,
+                    wordType: candidate.intentType,
+                    exampleSentence: candidate.exampleSentence,
+                    pronunciationGuide: candidate.pronunciationGuide,
+                  );
+                  await _cardsRepository.saveResult(analysis, null);
+                  await XPService.instance.addXP(35);
+                  savedWords.add(candidate.word);
 
-              if (!mounted) {
-                return;
-              }
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đã lưu từ vựng! +35 XP')),
+                    );
+                  }
+                }
 
-              setModalState(() {
-                pending.removeWhere(
-                  (item) => item.normalizedWord == candidate.normalizedWord,
-                );
-              });
+                if (!mounted) {
+                  return;
+                }
 
-              if (pending.isEmpty && Navigator.of(dialogContext).canPop()) {
-                Navigator.of(dialogContext).pop();
+                setModalState(() {
+                  pending.removeWhere(
+                    (item) => item.normalizedWord == candidate.normalizedWord,
+                  );
+                });
+
+                if (pending.isEmpty) {
+                  Navigator.of(dialogContext).pop();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(e.toString())));
+                }
               }
             }
 
@@ -119,9 +149,7 @@ class _MainScreenState extends State<MainScreen> {
               for (final item in toSave) {
                 await saveOne(item);
               }
-              if (Navigator.of(dialogContext).canPop()) {
-                Navigator.of(dialogContext).pop();
-              }
+              // saveOne already pops when pending is empty
             }
 
             return AlertDialog(
@@ -174,7 +202,7 @@ class _MainScreenState extends State<MainScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Thoát'),
+                  child: const Text('Đóng'),
                 ),
                 if (pending.isNotEmpty)
                   FilledButton(
@@ -194,26 +222,33 @@ class _MainScreenState extends State<MainScreen> {
   Widget _getBody() {
     switch (_currentIndex) {
       case 0:
-        return HomeScreen(
-          userName: _userName,
-          streak: 12,
-          level: 5,
-          experience: 800,
-          nextLevelExperience: 1000,
-          onOpenDecks: () => _onNavTap(3),
-          onOpenDictionary: () => _onNavTap(2),
-          onOpenCameraQuest: _onCameraTap,
+        return ValueListenableBuilder<int>(
+          valueListenable: XPService.instance.xpNotifier,
+          builder: (context, xp, child) {
+            return HomeScreen(
+              userName: _userName,
+              streak: 12,
+              level: (xp ~/ 1000) + 1,
+              experience: xp,
+              nextLevelExperience: ((xp ~/ 1000) + 1) * 1000,
+              onOpenDecks: () => _onNavTap(3),
+              onOpenDictionary: () => _onNavTap(2),
+              onOpenCameraQuest: _onCameraTap,
+            );
+          },
         );
       case 1:
         return const CalendarScreen();
       case 2:
-        return const DictionaryScreen();
+        return DictionaryScreen(
+          onSearchModeChanged: _onDictionarySearchModeChanged,
+        );
       case 3:
         return DeckListScreen();
       case 4:
         return const AchievementsScreen();
       case -1:
-        return const ImageCaptureScreen();
+        return ImageCaptureScreen(onDone: () => _onNavTap(2));
       default:
         return const Center(child: Text('Trang chủ'));
     }
@@ -226,13 +261,13 @@ class _MainScreenState extends State<MainScreen> {
         title: const Text('AI English Learning'),
         centerTitle: true,
         elevation: 0,
-        actions: [
-          ProfileIcon(onTap: _onProfileTap),
-        ],
+        actions: [ProfileIcon(onTap: _onProfileTap)],
       ),
-        body: Stack(
-          children: [
-            _getBody(),
+      body: Stack(
+        children: [
+          _getBody(),
+          if (_currentIndex != -1 &&
+              !(_currentIndex == 2 && _isDictionarySearching))
             Positioned(
               right: 16,
               bottom: 92,
@@ -241,20 +276,27 @@ class _MainScreenState extends State<MainScreen> {
                 mini: true,
                 onPressed: _onChatTap,
                 tooltip: 'Chat với AI',
-                child: const Icon(Icons.chat_bubble),
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  'assets/onboarding/robot_icon.png',
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-          ],
-        ),
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 28.0),
-          child: FloatingActionButton(
-            onPressed: _onCameraTap,
-            child: const Icon(Icons.camera_alt),
-            tooltip: 'Chụp ảnh',
-          ),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        ],
+      ),
+      floatingActionButton:
+          _currentIndex == -1 || (_currentIndex == 2 && _isDictionarySearching)
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 28.0),
+              child: FloatingActionButton(
+                onPressed: _onCameraTap,
+                child: const Icon(Icons.camera_alt),
+                tooltip: 'Chụp ảnh',
+              ),
+            ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: _currentIndex < 0 ? 0 : _currentIndex,
         onTap: _onNavTap,
@@ -305,8 +347,11 @@ class _DrawerNavTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: Colors.white54),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: Colors.white54,
+                ),
               ],
             ),
           ),
@@ -316,11 +361,7 @@ class _DrawerNavTile extends StatelessWidget {
   }
 }
 
-enum _ProfileMenuAction {
-  profile,
-  settings,
-  logout,
-}
+enum _ProfileMenuAction { profile, settings, logout }
 
 class _AnimatedProfileDrawer extends StatefulWidget {
   final String userName;
@@ -337,7 +378,8 @@ class _AnimatedProfileDrawer extends StatefulWidget {
   State<_AnimatedProfileDrawer> createState() => _AnimatedProfileDrawerState();
 }
 
-class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with SingleTickerProviderStateMixin {
+class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
@@ -349,14 +391,12 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    
-    _slideAnimation = Tween<double>(begin: 300.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
-    );
-    
+
+    _slideAnimation = Tween<double>(
+      begin: 300.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -383,7 +423,9 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isDestructive ? Colors.red.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+          color: isDestructive
+              ? Colors.red.withOpacity(0.1)
+              : Colors.blue.withOpacity(0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
@@ -430,7 +472,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                   Container(
+                  Container(
                     width: 40,
                     height: 5,
                     decoration: BoxDecoration(
@@ -443,7 +485,9 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                     radius: 40,
                     backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.1),
                     child: Text(
-                      widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
+                      widget.userName.isNotEmpty
+                          ? widget.userName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -463,10 +507,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                   const SizedBox(height: 4),
                   Text(
                     widget.userEmail,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 32),
                   Container(
@@ -499,7 +540,7 @@ class _AnimatedProfileDrawerState extends State<_AnimatedProfileDrawer> with Sin
                   ),
                   const SizedBox(height: 16),
                   Container(
-                     decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                       color: Colors.red[50],
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.red[100]!),

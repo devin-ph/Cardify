@@ -8,9 +8,11 @@ import 'screens/main_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/xp_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await XPService.instance.init();
   try {
     await dotenv.load(fileName: '.env');
   } catch (_) {
