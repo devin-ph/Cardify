@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -44,6 +45,9 @@ class AiVoiceChatDialog extends StatefulWidget {
 
 class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     with SingleTickerProviderStateMixin {
+  static const String _aiChatNarratorKey =
+      'profile_settings_ai_chat_narrator_enabled';
+
   final SpeechToText _speech = SpeechToText();
   final FlutterTts _tts = FlutterTts();
   final VoiceChatService _chatService = VoiceChatService();
@@ -56,7 +60,10 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
 
   _VoiceMode _mode = _VoiceMode.idle;
   bool _speechReady = false;
+  bool _narratorEnabled = true;
   String _listeningText = '';
+  int _activeSpeechSessionId = 0;
+  int? _submittedSpeechSessionId;
   Map<String, String>? _viVoice;
   Map<String, String>? _enVoice;
 
@@ -70,8 +77,20 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     _pulseAnimation = Tween<double>(begin: 0.9, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _loadNarratorSetting();
     _initSpeech();
     _initTts();
+  }
+
+  Future<void> _loadNarratorSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool(_aiChatNarratorKey);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _narratorEnabled = enabled ?? _narratorEnabled;
+    });
   }
 
   Future<void> _initSpeech() async {
@@ -177,13 +196,17 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     }
 
     if (_speech.isListening) {
+      final sessionId = _activeSpeechSessionId;
       await _speech.stop();
-      if (_listeningText.trim().isNotEmpty) {
-        await _sendMessage(_listeningText.trim());
-      }
+      await _submitRecognizedMessageIfNeeded(
+        _listeningText,
+        sessionId: sessionId,
+      );
       return;
     }
 
+    _activeSpeechSessionId++;
+    _submittedSpeechSessionId = null;
     setState(() {
       _mode = _VoiceMode.listening;
       _listeningText = '';
@@ -208,17 +231,36 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     });
 
     if (result.finalResult) {
+      final sessionId = _activeSpeechSessionId;
       await _speech.stop();
-      final message = _listeningText.trim();
-      if (message.isNotEmpty) {
-        await _sendMessage(message);
-      } else {
+      final submitted = await _submitRecognizedMessageIfNeeded(
+        _listeningText,
+        sessionId: sessionId,
+      );
+      if (!submitted) {
         setState(() {
           _mode = _VoiceMode.idle;
         });
         _updatePulse();
       }
     }
+  }
+
+  Future<bool> _submitRecognizedMessageIfNeeded(
+    String message, {
+    required int sessionId,
+  }) async {
+    final normalized = message.trim();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    if (_submittedSpeechSessionId == sessionId) {
+      return false;
+    }
+
+    _submittedSpeechSessionId = sessionId;
+    await _sendMessage(normalized);
+    return true;
   }
 
   Future<void> _sendMessage(String message) async {
@@ -244,12 +286,14 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
       }
       setState(() {
         _messages.add(_ChatItem(role: 'assistant', text: reply.response));
-        _mode = _VoiceMode.speaking;
+        _mode = _narratorEnabled ? _VoiceMode.speaking : _VoiceMode.idle;
       });
       _updatePulse();
       _collectVocabulary(reply);
-      await _speakReply(reply);
-      if (mounted) {
+      if (_narratorEnabled) {
+        await _speakReply(reply);
+      }
+      if (mounted && _mode != _VoiceMode.idle) {
         setState(() {
           _mode = _VoiceMode.idle;
         });
