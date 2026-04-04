@@ -51,9 +51,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã đăng xuất.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã đăng xuất.')));
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const CardifyLoginScreen()),
         (route) => false,
