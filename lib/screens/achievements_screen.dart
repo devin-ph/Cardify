@@ -2,6 +2,9 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+import '../services/saved_cards_repository.dart';
+import '../services/xp_service.dart';
+
 class AchievementsScreen extends StatefulWidget {
   const AchievementsScreen({super.key});
 
@@ -14,10 +17,13 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   late final AnimationController _ambientController;
   late final AnimationController _progressController;
 
-  static const int _userTotalCardsStudied =
-      120; // Mock current user total cards
-  static const int _userTotalSetsCompleted = 4; // Mock user total sets
-  static const int _currentStreak = 8;
+  int get _userTotalCardsStudied =>
+      SavedCardsRepository.instance.cardsNotifier.value.length;
+  int get _userTotalScans => SavedCardsRepository.instance.cardsNotifier.value
+      .where((c) => c.imageBytes != null || c.imageUrl != null)
+      .length;
+  int get _currentStreak => XPService.instance.streakNotifier.value;
+  int get _userTotalXp => XPService.instance.xpNotifier.value;
 
   bool _showAllBadges = false;
 
@@ -34,82 +40,82 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     {
       'id': 'flowers',
       'name': 'Bụi hoa',
-      'desc': 'Hoàn thành 1 bộ thẻ',
+      'desc': 'Quét 1 đồ vật',
       'icon': '🌺',
-      'reqType': 'sets',
+      'reqType': 'scans',
       'reqValue': 1,
       'color': Color(0xFFF472B6),
     },
     {
       'id': 'trees',
       'name': 'Cây xanh',
-      'desc': 'Hoàn thành 3 bộ thẻ',
+      'desc': 'Quét 5 đồ vật',
       'icon': '🌳',
-      'reqType': 'sets',
-      'reqValue': 3,
+      'reqType': 'scans',
+      'reqValue': 5,
       'color': Color(0xFF4ADE80),
     },
     {
       'id': 'animals',
       'name': 'Động vật',
-      'desc': 'Hoàn thành 5 bộ thẻ',
+      'desc': 'Quét 15 đồ vật',
       'icon': '🦌',
-      'reqType': 'sets',
-      'reqValue': 5,
+      'reqType': 'scans',
+      'reqValue': 15,
       'color': Color(0xFF10B981),
     },
     {
       'id': 'household',
       'name': 'Nhà nấm',
-      'desc': 'Hoàn thành 8 bộ thẻ',
+      'desc': 'Quét 30 đồ vật',
       'icon': '🍄',
-      'reqType': 'sets',
-      'reqValue': 8,
+      'reqType': 'scans',
+      'reqValue': 30,
       'color': Color(0xFFF87171),
     },
     {
       'id': 'tent',
       'name': 'Lều trại',
-      'desc': 'Học 50 thẻ',
+      'desc': 'Đạt hạng Đồng',
       'icon': '⛺',
-      'reqType': 'cards',
-      'reqValue': 50,
+      'reqType': 'xp',
+      'reqValue': 200,
       'color': Color(0xFF60A5FA),
     },
     {
       'id': 'lighthouse',
       'name': 'Hải đăng',
-      'desc': 'Học 100 thẻ',
+      'desc': 'Đạt hạng Bạc',
       'icon': '🗼',
-      'reqType': 'cards',
-      'reqValue': 100,
+      'reqType': 'xp',
+      'reqValue': 1000,
       'color': Color(0xFF2563EB),
     },
     {
       'id': 'castle',
       'name': 'Lâu đài',
-      'desc': 'Học 200 thẻ',
+      'desc': 'Đạt hạng Vàng',
       'icon': '🏰',
-      'reqType': 'cards',
-      'reqValue': 200,
+      'reqType': 'xp',
+      'reqValue': 3000,
       'color': Color(0xFFA78BFA),
     },
     {
       'id': 'airballoon',
       'name': 'Khí cầu',
-      'desc': 'Học 300 thẻ',
+      'desc': 'Đạt hạng Kim Cương',
       'icon': '🎈',
-      'reqType': 'cards',
-      'reqValue': 300,
+      'reqType': 'xp',
+      'reqValue': 6000,
       'color': Color(0xFFFBBF24),
     },
     {
       'id': 'space',
       'name': 'Vũ trụ',
-      'desc': 'Học 500 thẻ',
+      'desc': 'Đạt hạng Cao Thủ',
       'icon': '🚀',
-      'reqType': 'cards',
-      'reqValue': 500,
+      'reqType': 'xp',
+      'reqValue': 10000,
       'color': Color(0xFFC084FC),
     },
     {
@@ -133,20 +139,21 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   ];
 
   bool _isElementUnlocked(Map<String, dynamic> e) {
-    if (e['reqType'] == 'sets') {
-      return _userTotalSetsCompleted >= e['reqValue'];
+    if (e['reqType'] == 'scans') {
+      return _userTotalScans >= e['reqValue'];
     } else if (e['reqType'] == 'cards') {
       return _userTotalCardsStudied >= e['reqValue'];
     } else if (e['reqType'] == 'Số ngày') {
       return _currentStreak >= e['reqValue'];
+    } else if (e['reqType'] == 'xp') {
+      return _userTotalXp >= e['reqValue'];
     }
     return false;
   }
 
-  static const int _userTotalXp = 3450; // Mock current user XP
-
   static const List<Map<String, dynamic>> _milestoneLeagues = [
-    {'name': 'Đồng (Bronze)', 'xpReq': 0, 'color': Color(0xFFCD7F32)},
+    {'name': 'Chưa xếp hạng', 'xpReq': 0, 'color': Color(0xFF9E9E9E)},
+    {'name': 'Đồng (Bronze)', 'xpReq': 200, 'color': Color(0xFFCD7F32)},
     {'name': 'Bạc (Silver)', 'xpReq': 1000, 'color': Color(0xFFC0C0C0)},
     {'name': 'Vàng (Gold)', 'xpReq': 3000, 'color': Color(0xFFFFD700)},
     {'name': 'Kim Cương (Diamond)', 'xpReq': 6000, 'color': Color(0xFF00BFFF)},
@@ -154,10 +161,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   ];
 
   static const List<Map<String, dynamic>> _ghostProfiles = [
-    {'name': 'Cú Chăm Chỉ', 'avatar': '🦉', 'xpOffset': 150},
-    {'name': 'Mèo Lười', 'avatar': '🐱', 'xpOffset': -200},
-    {'name': 'Sói Cô Độc', 'avatar': '🐺', 'xpOffset': 50},
-    {'name': 'Gấu Bé', 'avatar': '🐻', 'xpOffset': -80},
+    {'name': 'Cú Chăm Chỉ', 'avatar': '🦉', 'baseXp': 1200, 'dailyGains': 80},
+    {'name': 'Mèo Lười', 'avatar': '🐱', 'baseXp': 400, 'dailyGains': 20},
+    {'name': 'Sói Cô Độc', 'avatar': '🐺', 'baseXp': 1800, 'dailyGains': 120},
+    {'name': 'Gấu Bé', 'avatar': '🐻', 'baseXp': 700, 'dailyGains': 50},
   ];
 
   Map<String, dynamic> get _currentLeague {
@@ -192,15 +199,40 @@ class _AchievementsScreenState extends State<AchievementsScreen>
 
   List<Map<String, dynamic>> _getDailySeededGhosts() {
     final now = DateTime.now();
-    final seed = now.year * 10000 + now.month * 100 + now.day;
-    final random = Random(seed);
 
     List<Map<String, dynamic>> bots = _ghostProfiles.map((ghost) {
-      final dailyVar =
-          (random.nextInt(7) - 3) * 50; // Random variance in steps of 50
-      int botXp = _userTotalXp + (ghost['xpOffset'] as int) + dailyVar;
-      if (botXp < 0) botXp = 0;
-      botXp = (botXp / 50).round() * 50; // Ensure perfectly round numbers
+      int baseBotXp = ghost['baseXp'] as int;
+      int dailyGain = ghost['dailyGains'] as int;
+
+      // Seed dựa trên ngày hiện tại và tên bot để đảm bảo mỗi ngày bot được gán ngẫu nhiên hợp lý
+      final todaySeed = now.year * 1000 + now.day + ghost['name'].hashCode;
+      final random = Random(todaySeed);
+
+      // Tính khoảng cách (gap) tiêu chuẩn cho từng bot. Bot nào baseXp và dailyGain cao thì khoảng cách xa hơn
+      int gap = (baseBotXp * 0.4).round() + random.nextInt(dailyGain * 10);
+
+      // Điều chỉnh lại thuộc tính cho các bot cụ thể
+      if (dailyGain >= 100) {
+        // Sói Cô Độc: Bỏ rất xa (có thể lên tới +1500 XP)
+        gap = 500 + random.nextInt(1000);
+      } else if (dailyGain >= 60) {
+        // Cú Chăm Chỉ: Vượt ổn định (+300 đến +800 XP)
+        gap = 300 + random.nextInt(500);
+      } else if (dailyGain >= 40) {
+        // Gấu Bé: Lúc tụt lúc lên (từ -200 đến +400 XP)
+        gap = -200 + random.nextInt(600);
+      } else {
+        // Mèo Lười: Luôn lười (tụt so với user -400 đến -50 XP)
+        gap = -400 + random.nextInt(350);
+      }
+
+      int botXp = _userTotalXp + gap;
+
+      // Xử lý không cho âm và làm tròn đến hàng chục
+      if (botXp <= 0) {
+        botXp = random.nextInt(40) + 10;
+      }
+      botXp = (botXp / 10).round() * 10;
 
       return {
         'name': ghost['name'],
@@ -444,16 +476,6 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            next != null
-                ? '$_userTotalXp/${next['xpReq']} XP để lên bậc tiếp theo'
-                : 'Bạn đã đạt cấp cao nhất!',
-            style: const TextStyle(
-              color: Color(0xFF42516E),
-              fontWeight: FontWeight.w600,
-            ),
           ),
           const SizedBox(height: 12),
           ClipRRect(
@@ -732,21 +754,38 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                     ),
                   ),
                   // Barren Mode
-                  if (isBarren)
-                    Positioned(
-                      bottom: 40,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Transform.scale(
-                          scale: 1.5,
-                          child: const Text(
-                            '🏜️',
-                            style: TextStyle(fontSize: 50),
-                          ),
-                        ),
-                      ),
+                  if (isBarren) ...[
+                    // Hòn đá 1
+                    const Positioned(
+                      bottom: 30,
+                      left: 110,
+                      child: Text('🪨', style: TextStyle(fontSize: 32)),
                     ),
+                    // Khúc gỗ khô
+                    const Positioned(
+                      bottom: 25,
+                      right: 120,
+                      child: Text('🪵', style: TextStyle(fontSize: 36)),
+                    ),
+                    // Xương rồng 1
+                    const Positioned(
+                      bottom: 50,
+                      left: 45,
+                      child: Text('🌵', style: TextStyle(fontSize: 60)),
+                    ),
+                    // Xương rồng 2
+                    const Positioned(
+                      bottom: 45,
+                      right: 50,
+                      child: Text('🌵', style: TextStyle(fontSize: 45)),
+                    ),
+                    // Hòn đá nhỏ
+                    const Positioned(
+                      bottom: 60,
+                      right: 100,
+                      child: Text('🪨', style: TextStyle(fontSize: 24)),
+                    ),
+                  ],
                   // Organized Elements by Depth Layers
                   if (!isBarren) ...[
                     // BACK LAYER
@@ -1015,12 +1054,14 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                 final e = displayElements[index];
 
                 int currentProgress = 0;
-                if (e['reqType'] == 'sets') {
-                  currentProgress = _userTotalSetsCompleted;
+                if (e['reqType'] == 'scans') {
+                  currentProgress = _userTotalScans;
                 } else if (e['reqType'] == 'cards') {
                   currentProgress = _userTotalCardsStudied;
                 } else if (e['reqType'] == 'Số ngày') {
                   currentProgress = _currentStreak;
+                } else if (e['reqType'] == 'xp') {
+                  currentProgress = _userTotalXp;
                 }
 
                 return _OasisItemCard(
