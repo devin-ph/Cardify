@@ -12,6 +12,7 @@ import 'services/xp_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await XPService.instance.init();
   try {
     await dotenv.load(fileName: 'assets/.env');

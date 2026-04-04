@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -306,7 +307,7 @@ class SavedCardsRepository {
       return null;
     }
 
-    final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return null;
 
     try {
@@ -347,7 +348,7 @@ class SavedCardsRepository {
         }
 
         await client.from(_tableName).insert({
-          'user_id': firebase_auth.FirebaseAuth.instance.currentUser?.uid,
+          'user_id': FirebaseAuth.instance.currentUser?.uid,
           'word': result.word,
           'topic': result.topic,
           'phonetic': result.phonetic,
@@ -428,7 +429,7 @@ class SavedCardsRepository {
     if (client != null) {
       try {
         await client.from(_tableName).insert({
-          'user_id': firebase_auth.FirebaseAuth.instance.currentUser?.uid,
+          'user_id': FirebaseAuth.instance.currentUser?.uid,
           'word': card.word,
           'topic': card.topic,
           'phonetic': card.phonetic,
@@ -561,7 +562,7 @@ class SavedCardsRepository {
     required AnalysisResult result,
     Uint8List? imageBytes,
   }) async {
-    final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw Exception('Người dùng chưa đăng nhập');
 
     final client = _clientOrNull;
@@ -663,7 +664,7 @@ class SavedCardsRepository {
           .stream(primaryKey: ['word'])
           .order('saved_at', ascending: false)
           .listen((rows) {
-            final uid = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+            final uid = FirebaseAuth.instance.currentUser?.uid;
             final userRows = uid != null
                 ? rows.where((row) => row['user_id'] == uid).toList()
                 : <Map<String, dynamic>>[];
