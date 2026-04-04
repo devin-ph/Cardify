@@ -1,5 +1,6 @@
 import 'package:cardify_ai_english_learning_app/screens/deck_list_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/ai_voice_chat_dialog.dart';
 import '../widgets/profile_icon.dart';
 import '../widgets/custom_bottom_nav_bar.dart';
@@ -19,12 +20,38 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  static const String _autoPlayKey = 'profile_settings_auto_play_enabled';
+
   int _currentIndex = 0;
   String _userName = 'Explorer';
   bool _pushReminderEnabled = true;
   bool _autoPlayPronunciation = true;
   bool _aiHintsEnabled = true;
   bool _compactLayoutEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAutoPlaySetting();
+  }
+
+  Future<void> _loadAutoPlaySetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    final persistedValue = prefs.getBool(_autoPlayKey);
+
+    if (!mounted || persistedValue == null) {
+      return;
+    }
+
+    setState(() {
+      _autoPlayPronunciation = persistedValue;
+    });
+  }
+
+  Future<void> _persistAutoPlaySetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoPlayKey, value);
+  }
 
   void _setScreenIndex(int index) {
     if (_currentIndex == index) {
@@ -62,6 +89,7 @@ class _MainScreenState extends State<MainScreen> {
         _userName = updatedName;
       });
     }
+    await _loadAutoPlaySetting();
   }
 
   void _onProfileMenuAction(_ProfileMenuAction action) {
@@ -143,6 +171,7 @@ class _MainScreenState extends State<MainScreen> {
                           onChanged: (value) {
                             setSheetState(() => _autoPlayPronunciation = value);
                             setState(() => _autoPlayPronunciation = value);
+                            _persistAutoPlaySetting(value);
                           },
                         ),
                       ],

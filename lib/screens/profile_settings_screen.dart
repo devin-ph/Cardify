@@ -26,6 +26,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   static const String _avatarKey = 'profile_settings_avatar_base64';
   static const String _aiHintsKey = 'profile_settings_ai_hints_enabled';
   static const String _autoPlayKey = 'profile_settings_auto_play_enabled';
+  static const String _aiChatNarratorKey =
+      'profile_settings_ai_chat_narrator_enabled';
   static const String _dailyReminderKey = 'profile_settings_daily_reminder';
   static const String _compactLayoutKey = 'profile_settings_compact_layout';
 
@@ -35,6 +37,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   Uint8List? _avatarBytes;
   bool _aiHintsEnabled = true;
   bool _autoPlayPronunciation = true;
+  bool _aiChatNarratorEnabled = true;
   bool _dailyReminderEnabled = true;
   bool _compactLayoutEnabled = false;
 
@@ -52,6 +55,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     final persistedAvatarBase64 = prefs.getString(_avatarKey);
     final persistedAiHints = prefs.getBool(_aiHintsKey);
     final persistedAutoPlay = prefs.getBool(_autoPlayKey);
+    final persistedAiChatNarrator = prefs.getBool(_aiChatNarratorKey);
     final persistedReminder = prefs.getBool(_dailyReminderKey);
     final persistedCompactLayout = prefs.getBool(_compactLayoutKey);
 
@@ -75,6 +79,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       _avatarBytes = restoredAvatar;
       _aiHintsEnabled = persistedAiHints ?? _aiHintsEnabled;
       _autoPlayPronunciation = persistedAutoPlay ?? _autoPlayPronunciation;
+      _aiChatNarratorEnabled =
+          persistedAiChatNarrator ?? _aiChatNarratorEnabled;
       _dailyReminderEnabled = persistedReminder ?? _dailyReminderEnabled;
       _compactLayoutEnabled = persistedCompactLayout ?? _compactLayoutEnabled;
     });
@@ -85,6 +91,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     await prefs.setString(_nameKey, _name);
     await prefs.setBool(_aiHintsKey, _aiHintsEnabled);
     await prefs.setBool(_autoPlayKey, _autoPlayPronunciation);
+    await prefs.setBool(_aiChatNarratorKey, _aiChatNarratorEnabled);
     await prefs.setBool(_dailyReminderKey, _dailyReminderEnabled);
     await prefs.setBool(_compactLayoutKey, _compactLayoutEnabled);
 
@@ -536,6 +543,18 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     title: const Text('Tự động phát phát âm'),
                     subtitle: const Text('Tự động đọc từ khi mở thẻ học'),
                     secondary: const Icon(Icons.record_voice_over_rounded),
+                  ),
+                  SwitchListTile(
+                    value: _aiChatNarratorEnabled,
+                    onChanged: (value) {
+                      setState(() => _aiChatNarratorEnabled = value);
+                      _persistSettings();
+                    },
+                    title: const Text('Narrator cho chat AI'),
+                    subtitle: const Text(
+                      'Bật/tắt giọng đọc phản hồi trong chat AI',
+                    ),
+                    secondary: const Icon(Icons.mic_external_on_rounded),
                   ),
                 ],
               ),

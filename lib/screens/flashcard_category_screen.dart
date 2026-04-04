@@ -27,6 +27,8 @@ class FlashcardScreen extends StatefulWidget {
 class _FlashcardScreenState extends State<FlashcardScreen> {
   static const String _postponedWordsStoragePrefix =
       'practice_postponed_words_v1';
+  static const String _autoPlaySettingKey =
+      'profile_settings_auto_play_enabled';
   final FlutterTts _tts = FlutterTts();
   final SavedCardsRepository _repository = SavedCardsRepository.instance;
   final ImagePicker _imagePicker = ImagePicker();
@@ -239,6 +241,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   int selectedDeck = 0;
   int _currentCardIndex = 0;
   bool _isPracticeMode = false;
+  bool _autoPlayPronunciationEnabled = false;
+  String? _lastAutoSpokenCardKey;
   DateTime? _practiceStartedAt;
   String? _recentlyMarkedKnownWordKey;
   String? _recentlyPostponedWordKey;
@@ -643,9 +647,28 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     super.initState();
     _pageController = PageController(viewportFraction: 0.82);
     _initTts();
+    _loadAutoPlayPronunciationSetting();
     _ensureVocabularyCount();
     _repository.watchCards();
     _loadPostponedWordsForTopic(_currentDisplayTopic());
+  }
+
+  Future<void> _loadAutoPlayPronunciationSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    final persistedValue = prefs.getBool(_autoPlaySettingKey);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _autoPlayPronunciationEnabled = persistedValue ?? true;
+      _lastAutoSpokenCardKey = null;
+    });
+
+    if (!(_autoPlayPronunciationEnabled)) {
+      await _tts.stop();
+    }
   }
 
   String _currentDisplayTopic() {
@@ -787,6 +810,26 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     }
     await _tts.stop();
     await _tts.speak(word);
+  }
+
+  void _scheduleAutoSpeakCurrentCard(Flashcard? flashcard) {
+    if (!_autoPlayPronunciationEnabled || flashcard == null) {
+      return;
+    }
+
+    final autoSpeakKey =
+        '${_isPracticeMode ? 'practice' : 'normal'}::${flashcard.word.trim().toLowerCase()}';
+    if (_lastAutoSpokenCardKey == autoSpeakKey) {
+      return;
+    }
+    _lastAutoSpokenCardKey = autoSpeakKey;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_autoPlayPronunciationEnabled) {
+        return;
+      }
+      _speakWord(flashcard.word);
+    });
   }
 
   void _closeWithPracticeResult(BuildContext context) {
@@ -1326,6 +1369,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               final currentWordKey = currentFlashcard?.word
                   .trim()
                   .toLowerCase();
+              _scheduleAutoSpeakCurrentCard(currentFlashcard);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
