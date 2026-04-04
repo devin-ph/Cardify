@@ -123,60 +123,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-
-
-
   static const List<Map<String, dynamic>> _unscannedHintsPool = [
-      {
-        'hint': 'Một thiết bị điện tử cầm tay dùng để nối mạng, gọi điện',
-        'topic': 'Electronics',
-      },
-      {
-        'hint': 'Đồ nội thất dùng để ngồi làm việc, thường có tựa lưng',
-        'topic': 'Furniture',
-      },
-      {
-        'hint': 'Loài động vật gần gũi với con người, thích bắt chuột',
-        'topic': 'Animals',
-      },
-      {'hint': 'Cây tỏa bóng mát, có nhiều lá xanh', 'topic': 'Nature'},
-      {'hint': 'Máy tính cá nhân có thể gập lại gọn gàng', 'topic': 'Technology'},
-      {
-        'hint': 'Nơi chứa đựng tri thức, gồm nhiều trang giấy',
-        'topic': 'Learning',
-      },
-      {
-        'hint': 'Loại trái cây màu vàng, thân dài, khỉ rất thích ăn',
-        'topic': 'Food',
-      },
-      {
-        'hint': 'Phương tiện di chuyển hai bánh, dùng sức người để đạp',
-        'topic': 'Vehicles',
-      },
-      {
-        'hint': 'Vật dụng dùng để uống nước hằng ngày',
-        'topic': 'Household Items',
-      },
-      {
-        'hint': 'Đồ vật che mưa, che nắng khi đi bộ ngoài trời',
-        'topic': 'Household Items',
-      },
-    ];
+    {
+      'hint': 'Một thiết bị điện tử cầm tay dùng để nối mạng, gọi điện',
+      'topic': 'Electronics',
+    },
+    {
+      'hint': 'Đồ nội thất dùng để ngồi làm việc, thường có tựa lưng',
+      'topic': 'Furniture',
+    },
+    {
+      'hint': 'Loài động vật gần gũi với con người, thích bắt chuột',
+      'topic': 'Animals',
+    },
+    {'hint': 'Cây tỏa bóng mát, có nhiều lá xanh', 'topic': 'Nature'},
+    {'hint': 'Máy tính cá nhân có thể gập lại gọn gàng', 'topic': 'Technology'},
+    {
+      'hint': 'Nơi chứa đựng tri thức, gồm nhiều trang giấy',
+      'topic': 'Learning',
+    },
+    {
+      'hint': 'Loại trái cây màu vàng, thân dài, khỉ rất thích ăn',
+      'topic': 'Food',
+    },
+    {
+      'hint': 'Phương tiện di chuyển hai bánh, dùng sức người để đạp',
+      'topic': 'Vehicles',
+    },
+    {
+      'hint': 'Vật dụng dùng để uống nước hằng ngày',
+      'topic': 'Household Items',
+    },
+    {
+      'hint': 'Đồ vật che mưa, che nắng khi đi bộ ngoài trời',
+      'topic': 'Household Items',
+    },
+  ];
 
-    List<Map<String, dynamic>> _getDailyUnscannedHints(
-      List<String> scannedWords,
-    ) {
-      // Để cho phong phú, ta có thể hiện luôn ra mà không cần lọc, hoặc lọc nếu cần
-      // Nhưng vì ta chỉ hiện hint, người dùng chưa quét thì ta cứ lấy ngẫu nhiên 3 hint mỗi ngày.
-      final now = DateTime.now();
-      final seed = now.year * 10000 + now.month * 100 + now.day;
-      final random = math.Random(seed);
+  List<Map<String, dynamic>> _getDailyUnscannedHints(
+    List<String> scannedWords,
+  ) {
+    // Để cho phong phú, ta có thể hiện luôn ra mà không cần lọc, hoặc lọc nếu cần
+    // Nhưng vì ta chỉ hiện hint, người dùng chưa quét thì ta cứ lấy ngẫu nhiên 3 hint mỗi ngày.
+    final now = DateTime.now();
+    final seed = now.year * 10000 + now.month * 100 + now.day;
+    final random = math.Random(seed);
 
-      final shuffled = List<Map<String, dynamic>>.from(_unscannedHintsPool)
-        ..shuffle(random);
-      return shuffled.take(3).toList();
-    }
-
+    final shuffled = List<Map<String, dynamic>>.from(_unscannedHintsPool)
+      ..shuffle(random);
+    return shuffled.take(3).toList();
+  }
 
   static const List<Map<String, dynamic>> _milestoneLeagues = [
     {'name': 'Chưa xếp hạng', 'xpReq': 0, 'color': Color(0xFF9E9E9E)},
@@ -994,7 +990,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildMysterySuggestionsSection() {
     final List<Map<String, dynamic>> mysteryWords = [
-        ..._getDailyUnscannedHints([]),
+      ..._getDailyUnscannedHints([]),
     ];
 
     return _FrostedPanel(
@@ -1029,7 +1025,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(
-                            Icons.question_mark_rounded,
+                            Icons.camera_alt_rounded,
                             size: 32,
                             color: Colors.blueGrey,
                           ),
@@ -1040,16 +1036,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Bạn biết từ này chưa?',
+                                '???',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 16,
-                                  color: Colors.black87,
                                 ),
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                item['hint'] as String,
+                                'Gợi ý: ${item['hint']}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: Colors.blueGrey.shade600,
                                   fontWeight: FontWeight.w600,
@@ -1058,6 +1055,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFB8500).withOpacity(0.14),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Chưa Tìm',
+                            style: TextStyle(
+                              color: Color(0xFFFB8500),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
                       ],
