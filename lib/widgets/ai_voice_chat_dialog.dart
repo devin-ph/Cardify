@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -66,6 +67,16 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
   int? _submittedSpeechSessionId;
   Map<String, String>? _viVoice;
   Map<String, String>? _enVoice;
+  Timer? _silenceTimer;
+
+  @override
+  void dispose() {
+    _silenceTimer?.cancel();
+    _pulseController.dispose();
+    _speech.stop();
+    _tts.stop();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -189,9 +200,9 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     }
   }
 
-  Future<void> _toggleListening() async {
+  Future<void> _startListening() async {
     if (!_speechReady) {
-      _pushAIMessage('Speech-to-text chua san sang tren thiet bi nay.');
+      _pushAIMessage('Speech-to-text chưa sẵn sàng trên thiết bị này.');
       return;
     }
 
@@ -221,6 +232,22 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     );
   }
 
+  Future<void> _stopListeningAndSend() async {
+    if (!_speechReady || _mode != _VoiceMode.listening) return;
+
+    await _speech.stop();
+    final textToSend = _listeningText.trim();
+
+    if (textToSend.isNotEmpty) {
+      await _sendMessage(textToSend);
+    } else {
+      setState(() {
+        _mode = _VoiceMode.idle;
+      });
+      _updatePulse();
+    }
+  }
+
   Future<void> _onSpeechResult(SpeechRecognitionResult result) async {
     if (!mounted) {
       return;
@@ -229,7 +256,6 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     setState(() {
       _listeningText = result.recognizedWords;
     });
-
     if (result.finalResult) {
       final sessionId = _activeSpeechSessionId;
       await _speech.stop();
@@ -271,8 +297,9 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     });
     _updatePulse();
 
-    final history = _messages
-        .take(_messages.length - 1)
+    final prevMessages = _messages.sublist(0, _messages.length - 1);
+    final history = prevMessages
+        .skip(prevMessages.length > 6 ? prevMessages.length - 6 : 0)
         .map((item) => {'role': item.role, 'content': item.text})
         .toList();
 
@@ -340,20 +367,8 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     _updatePulse();
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _speech.stop();
-    _tts.stop();
-    super.dispose();
-  }
-
   void _closeDialog() {
-    Navigator.of(context).pop(
-      VoiceChatSessionResult(
-        candidates: List<ChatVocabularyCandidate>.unmodifiable(_candidates),
-      ),
-    );
+    Navigator.of(context).pop(_candidates);
   }
 
   @override
@@ -409,7 +424,7 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
                 child: _messages.isEmpty
                     ? const Center(
                         child: Text(
-                          'Nhấn vào mic để nói nhé 👇\nBạn có thể hỏi AI về nghĩa của từ , diễn tả các hành động bạn gặp phải . Chúng tôi sẽ giúp bạn!',
+                          'Nhấn giữ mic để nói nhé 👇\nBạn có thể hỏi AI về nghĩa của từ , diễn tả các hành động bạn gặp phải . Chúng tôi sẽ giúp bạn!',
                           style: TextStyle(color: Colors.black54),
                         ),
                       )
@@ -445,15 +460,24 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.only(bottom: 18),
-              child: FloatingActionButton(
-                heroTag: 'voice-chat-mic',
-                onPressed: _toggleListening,
-                backgroundColor: _mode == _VoiceMode.listening
-                    ? const Color(0xFFEF5350)
-                    : const Color(0xFF2D7CFF),
-                child: Icon(
-                  _mode == _VoiceMode.listening ? Icons.stop : Icons.mic,
-                  color: Colors.white,
+              child: GestureDetector(
+                onLongPressStart: (_) => _startListening(),
+                onLongPressEnd: (_) => _stopListeningAndSend(),
+                onLongPressCancel: () => _stopListeningAndSend(),
+                child: AbsorbPointer(
+                  child: FloatingActionButton(
+                    heroTag: 'voice-chat-mic',
+                    onPressed: () {}, // Handled by GestureDetector
+                    backgroundColor: _mode == _VoiceMode.listening
+                        ? const Color(0xFFEF5350)
+                        : const Color(0xFF2D7CFF),
+                    child: Icon(
+                      _mode == _VoiceMode.listening
+                          ? Icons.mic_none
+                          : Icons.mic,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -465,10 +489,10 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
 
   Widget _buildVoiceOrb() {
     final modeText = switch (_mode) {
-      _VoiceMode.idle => 'San sang',
-      _VoiceMode.listening => 'Dang nghe ban noi...',
-      _VoiceMode.thinking => 'AI dang suy nghi...',
-      _VoiceMode.speaking => 'AI dang tra loi...',
+      _VoiceMode.idle => 'Nhấn giữ để nói',
+      _VoiceMode.listening => 'Đang nghe...',
+      _VoiceMode.thinking => 'Đang suy nghĩ...',
+      _VoiceMode.speaking => 'AI đang trả lời...',
     };
 
     final orbColor = switch (_mode) {
@@ -505,10 +529,11 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.smart_toy,
-                  color: Colors.white,
-                  size: 46,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/onboarding/robot_icon.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             );

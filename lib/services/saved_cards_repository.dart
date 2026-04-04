@@ -1,7 +1,9 @@
+import 'topic_classifier.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,6 +34,8 @@ class SavedCardsRepository {
 
   SupabaseClient? get _clientOrNull {
     try {
+      if (!dotenv.isInitialized) return null;
+
       final configuredUrl = dotenv.maybeGet('SUPABASE_URL')?.trim() ?? '';
       final configuredKey = dotenv.maybeGet('SUPABASE_ANON_KEY')?.trim() ?? '';
       if (configuredUrl.isEmpty ||
@@ -58,6 +62,7 @@ class SavedCardsRepository {
 
   String _dotenvValue(String key, String fallback) {
     try {
+      if (!dotenv.isInitialized) return fallback;
       return dotenv.maybeGet(key) ?? fallback;
     } catch (_) {
       return fallback;
@@ -65,8 +70,12 @@ class SavedCardsRepository {
   }
 
   String _storageScope() {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    return (userId == null || userId.isEmpty) ? 'anonymous' : userId;
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      return (userId == null || userId.isEmpty) ? 'anonymous' : userId;
+    } catch (_) {
+      return 'anonymous';
+    }
   }
 
   List<SavedCard> get cards => List.unmodifiable(_cards);
@@ -162,7 +171,7 @@ class SavedCardsRepository {
 
   int imageCountForTopic(String topic) {
     return _cards.where((card) {
-      if (card.topic != topic) {
+      if (TopicClassifier.normalizeTopic(card.topic) != topic) {
         return false;
       }
 
@@ -301,20 +310,19 @@ class SavedCardsRepository {
   }
 
   Future<String?> findExistingWord(String normalizedWord) async {
-    final localMatch = _cards.where((card) => card.id == normalizedWord);
-    if (localMatch.isNotEmpty) {
-      return localMatch.first.word;
-    }
-
     final client = _clientOrNull;
     if (client == null) {
       return null;
     }
 
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
     try {
       final row = await client
           .from(_tableName)
           .select('word')
+          .eq('user_id', uid)
           .ilike('word', normalizedWord)
           .limit(1)
           .maybeSingle();
@@ -347,7 +355,8 @@ class SavedCardsRepository {
           imageUrl = await _uploadImage(client, imageBytes, normalized);
         }
 
-        await client.from(_tableName).insert({
+        await client.from(_tableName).upsert({
+          'user_id': FirebaseAuth.instance.currentUser?.uid,
           'word': result.word,
           'topic': result.topic,
           'phonetic': result.phonetic,
@@ -357,8 +366,15 @@ class SavedCardsRepository {
           'image_url': imageUrl,
           'saved_at': timestamp.toIso8601String(),
         });
-      } catch (_) {
-        // Keep going with local persistence if remote storage is unavailable.
+      } on StorageException catch (error) {
+        throw Exception('Lỗi tải ảnh lên Supabase: ${error.message}');
+      } on PostgrestException catch (error) {
+        if (error.message.toLowerCase().contains('user_id')) {
+          throw Exception(
+            'Lỗi: Bảng flashcards trong Supabase chưa có cột "user_id". Vui lòng mở Supabase và thêm cột "user_id" kiểu "text".',
+          );
+        }
+        throw Exception('Lỗi lưu dữ liệu Supabase: ${error.message}');
       }
     }
 
@@ -420,7 +436,8 @@ class SavedCardsRepository {
 
     if (client != null) {
       try {
-        await client.from(_tableName).insert({
+        await client.from(_tableName).upsert({
+          'user_id': FirebaseAuth.instance.currentUser?.uid,
           'word': card.word,
           'topic': card.topic,
           'phonetic': card.phonetic,
@@ -430,8 +447,13 @@ class SavedCardsRepository {
           'image_url': card.imageUrl,
           'saved_at': card.savedAt.toIso8601String(),
         });
-      } catch (_) {
-        // Ignore remote failures; local save still succeeds.
+      } on PostgrestException catch (error) {
+        if (error.message.toLowerCase().contains('user_id')) {
+          throw Exception(
+            'Lỗi: Bảng flashcards trong Supabase chưa có cột "user_id". Vui lòng mở Supabase và thêm cột "user_id" kiểu "text".',
+          );
+        }
+        throw Exception('Lỗi lưu từ mới lên Supabase: ${error.message}');
       }
     }
 
@@ -483,7 +505,7 @@ class SavedCardsRepository {
     }
 
     if (client != null) {
-      final payload = {
+      final payload = { 'user_id': FirebaseAuth.instance.currentUser?.uid,
         'word': word.trim(),
         'topic': topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
         'phonetic': phonetic.trim(),
@@ -499,18 +521,16 @@ class SavedCardsRepository {
         if (existingWord != null) {
           await client
               .from(_tableName)
-              .update(payload)
-              .ilike('word', normalized);
+              .update(payload).eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '').ilike('word', normalized);
         } else {
-          await client.from(_tableName).insert(payload);
+          await client.from(_tableName).upsert(payload);
         }
       } catch (_) {
         if (existingWord != null) {
           try {
             await client
                 .from(_tableName)
-                .update(payload)
-                .ilike('word', normalized);
+                .update(payload).eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '').ilike('word', normalized);
           } catch (_) {
             // Ignore remote issues and keep the local save.
           }
@@ -548,6 +568,9 @@ class SavedCardsRepository {
     required AnalysisResult result,
     Uint8List? imageBytes,
   }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw Exception('Người dùng chưa đăng nhập');
+
     final client = _clientOrNull;
     final timestamp = DateTime.now();
     String? imageUrl;
@@ -574,6 +597,7 @@ class SavedCardsRepository {
               if (imageUrl != null) 'image_url': imageUrl,
               'saved_at': timestamp.toIso8601String(),
             })
+            .eq('user_id', uid)
             .eq('word', existingWord)
             .select()
             .maybeSingle();
@@ -643,10 +667,16 @@ class SavedCardsRepository {
     if (client != null) {
       _remoteSubscription ??= client
           .from(_tableName)
-          .stream(primaryKey: ['word'])
+          .stream(primaryKey: ['user_id', 'word'])
           .order('saved_at', ascending: false)
           .listen((rows) {
-            final mapped = rows.map((row) => SavedCard.fromMap(row)).toList();
+            final uid = FirebaseAuth.instance.currentUser?.uid;
+            final userRows = uid != null
+                ? rows.where((row) => row['user_id'] == uid).toList()
+                : <Map<String, dynamic>>[];
+            final mapped = userRows
+                .map((row) => SavedCard.fromMap(row))
+                .toList();
             final merged = <String, SavedCard>{
               for (final card in _cards) card.id: card,
               for (final card in mapped) card.id: card,
@@ -662,3 +692,7 @@ class SavedCardsRepository {
     return _cardsController.stream;
   }
 }
+
+
+
+

@@ -1,0 +1,1 @@
+import 'package:flutter_test/flutter_test.dart'; import 'package:flutter/material.dart'; void main() { testWidgets('Nested Scaffold Test', (WidgetTester tester) async { await tester.pumpWidget(MaterialApp(home: Scaffold(body: Scaffold(body: TextField(autofocus: true))))); await tester.showKeyboard(find.byType(TextField)); await tester.pumpAndSettle(); }); }

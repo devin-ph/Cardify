@@ -1,0 +1,1 @@
+import 'package:flutter_test/flutter_test.dart'; import 'package:flutter/material.dart'; import 'package:cardify_ai_english_learning_app/screens/dictionary_screen.dart'; void main() { testWidgets('Crash Test', (WidgetTester tester) async { await tester.pumpWidget(MaterialApp(home: DictionaryScreen())); await tester.tap(find.byIcon(Icons.search).first); await tester.pump(); }); }

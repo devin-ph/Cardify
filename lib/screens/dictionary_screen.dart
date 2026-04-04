@@ -3,15 +3,19 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/saved_card.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/topic_classifier.dart';
 import '../services/translation_service.dart';
+import '../services/xp_service.dart';
 
 class DictionaryScreen extends StatefulWidget {
-  const DictionaryScreen({super.key});
+  const DictionaryScreen({super.key, this.onSearchModeChanged});
+
+  final ValueChanged<bool>? onSearchModeChanged;
 
   @override
   State<DictionaryScreen> createState() => _DictionaryScreenState();
@@ -20,6 +24,7 @@ class DictionaryScreen extends StatefulWidget {
 class _DictionaryScreenState extends State<DictionaryScreen> {
   final SavedCardsRepository _repository = SavedCardsRepository.instance;
   late final TextEditingController _searchController;
+  bool _isSearching = false;
 
   bool _exampleContainsWord(String word, String example) {
     final normalizedWord = word.trim().toLowerCase();
@@ -360,11 +365,38 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   @override
   void dispose() {
+    if (_isSearching) {
+      widget.onSearchModeChanged?.call(false);
+    }
     _searchController.dispose();
     super.dispose();
   }
 
+  void _toggleSearch() {
+    setState(() {
+      if (_isSearching) {
+        _searchController.clear();
+      }
+      _isSearching = !_isSearching;
+    });
+    widget.onSearchModeChanged?.call(_isSearching);
+  }
+
+  List<SavedCard> _filterCardsByVietnameseName(List<SavedCard> cards) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return cards;
+    }
+
+    return cards
+        .where((card) => card.meaning.toLowerCase().contains(query))
+        .toList(growable: false);
+  }
+
   Future<void> _openCardDetails(SavedCard card) async {
+    bool isUploadingImage = false;
+    final ImagePicker picker = ImagePicker();
+
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -380,71 +412,138 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 borderRadius: BorderRadius.circular(20),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _CardDetailImage(
-                        imageUrl: card.imageUrl,
-                        imageBytes: card.imageBytes,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        card.word,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        card.phonetic.isEmpty
-                            ? 'Chưa có phiên âm'
-                            : card.phonetic,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          color: Colors.black54,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        card.meaning,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 18),
-                      ),
-                      if (card.example.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            card.example,
-                            style: const TextStyle(fontSize: 15, height: 1.4),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                  child: StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setStateDialog) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              _openEditCardSheet(card);
+                          _CardDetailImage(
+                            imageUrl: card.imageUrl,
+                            imageBytes: card.imageBytes,
+                            isUploading: isUploadingImage,
+                            onAddImage: () async {
+                              final XFile? image = await picker.pickImage(
+                                source: ImageSource.gallery,
+                                maxWidth: 800,
+                              );
+                              if (image != null) {
+                                setStateDialog(() {
+                                  isUploadingImage = true;
+                                });
+                                try {
+                                  final bytes = await image.readAsBytes();
+                                  await SavedCardsRepository.instance
+                                      .upsertManualCardFromReview(
+                                        word: card.word,
+                                        meaning: card.meaning,
+                                        topic: card.topic,
+                                        imageBytes: bytes,
+                                      );
+
+                                  await XPService.instance.addXP(15);
+
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Đã cập nhật ảnh thành công! +15 XP',
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  // Update the current card reference silently or just let the repository stream handle UI
+                                  card = SavedCard(
+                                    id: card.id,
+                                    topic: card.topic,
+                                    word: card.word,
+                                    phonetic: card.phonetic,
+                                    meaning: card.meaning,
+                                    example: card.example,
+                                    wordType: card.wordType,
+                                    imageBytes: bytes,
+                                    imageUrl: card.imageUrl,
+                                    savedAt: card.savedAt,
+                                  );
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Lỗi tải ảnh: $e'),
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  setStateDialog(() {
+                                    isUploadingImage = false;
+                                  });
+                                }
+                              }
                             },
-                            child: const Text('Chỉnh sửa'),
                           ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Đóng'),
+                          const SizedBox(height: 16),
+                          Text(
+                            card.word,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            card.phonetic.isEmpty
+                                ? 'Chưa có phiên âm'
+                                : card.phonetic,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            card.meaning,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 18),
+                          ),
+                          if (card.example.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Text(
+                                card.example,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  _openEditCardSheet(card);
+                                },
+                                child: const Text('Chỉnh sửa'),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Đóng'),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -506,15 +605,39 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Từ điển'),
+        title: _isSearching
+            ? Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(color: Colors.black87, fontSize: 15),
+                  decoration: const InputDecoration(
+                    hintText: 'Tìm theo tên tiếng Việt...',
+                    hintStyle: TextStyle(color: Colors.black45, fontSize: 14),
+                    prefixIcon: Icon(Icons.search, color: Colors.black54),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    isDense: true,
+                  ),
+                ),
+              )
+            : const Text('Bộ sưu tập'),
         backgroundColor: Colors.blue[400],
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Thêm từ mới',
-            onPressed: _showAddWordSheet,
-            icon: const Icon(Icons.add),
+            tooltip: _isSearching ? 'Đóng tìm kiếm' : 'Tìm kiếm',
+            onPressed: _toggleSearch,
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
           ),
         ],
       ),
@@ -522,6 +645,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         child: ValueListenableBuilder<List<SavedCard>>(
           valueListenable: _repository.cardsNotifier,
           builder: (context, cards, _) {
+            final filteredCards = _filterCardsByVietnameseName(cards);
+
             if (cards.isEmpty) {
               return const _CenteredMessage(
                 message: 'Chưa có từ nào được lưu',
@@ -529,28 +654,27 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               );
             }
 
-            return ListView.separated(
+            if (filteredCards.isEmpty) {
+              return const _CenteredMessage(
+                message: 'Không tìm thấy thẻ từ phù hợp',
+                icon: Icons.search_off,
+              );
+            }
+
+            return GridView.builder(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              itemCount: cards.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.70,
+              ),
+              itemCount: filteredCards.length,
               itemBuilder: (context, index) {
-                final card = cards[index];
-                return ListTile(
+                final card = filteredCards[index];
+                return _DictionaryCardGridItem(
+                  card: card,
                   onTap: () => _openCardDetails(card),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  tileColor: Colors.blue[50],
-                  leading: _CardThumbnail(
-                    imageUrl: card.imageUrl,
-                    imageBytes: card.imageBytes,
-                  ),
-                  title: Text(
-                    card.word,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(card.meaning),
-                  trailing: const Icon(Icons.chevron_right),
                 );
               },
             );
@@ -592,22 +716,54 @@ class _CardThumbnail extends StatelessWidget {
 }
 
 class _CardDetailImage extends StatelessWidget {
-  const _CardDetailImage({required this.imageUrl, required this.imageBytes});
+  const _CardDetailImage({
+    required this.imageUrl,
+    required this.imageBytes,
+    this.onAddImage,
+    this.isUploading = false,
+  });
 
   final String? imageUrl;
   final Uint8List? imageBytes;
+  final VoidCallback? onAddImage;
+  final bool isUploading;
 
   @override
   Widget build(BuildContext context) {
     if (imageUrl == null && imageBytes == null) {
-      return Container(
-        width: 230,
-        height: 230,
-        decoration: BoxDecoration(
-          color: Colors.blue[50],
-          borderRadius: BorderRadius.circular(16),
+      return GestureDetector(
+        onTap: isUploading ? null : onAddImage,
+        child: Container(
+          width: 230,
+          height: 230,
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.blue[200]!,
+              width: 2,
+              style: BorderStyle.solid,
+            ),
+          ),
+          child: Center(
+            child: isUploading
+                ? const CircularProgressIndicator()
+                : const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_a_photo, size: 64, color: Colors.blue),
+                      SizedBox(height: 8),
+                      Text(
+                        "Add Image",
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
-        child: const Icon(Icons.image, size: 120, color: Colors.blueGrey),
       );
     }
 
@@ -648,6 +804,126 @@ class _CardDetailImage extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: const Icon(Icons.broken_image, color: Colors.blueGrey),
+        ),
+      ),
+    );
+  }
+}
+
+class _DictionaryCardGridItem extends StatelessWidget {
+  const _DictionaryCardGridItem({required this.card, required this.onTap});
+
+  final SavedCard card;
+  final VoidCallback onTap;
+
+  Future<void> _speakWord() async {
+    final flutterTts = FlutterTts();
+    await flutterTts.setLanguage("en-US");
+    await flutterTts.speak(card.word);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 4,
+              child: card.imageUrl != null
+                  ? Image.network(
+                      card.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          size: 40,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.blue[100],
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.image,
+                        size: 40,
+                        color: Colors.blueGrey,
+                      ),
+                    ),
+            ),
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      card.topic,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${card.word} : ${card.meaning}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      card.phonetic.isNotEmpty ? card.phonetic : '...',
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Align(
+                      alignment: Alignment.center,
+                      child: IconButton(
+                        icon: const Icon(Icons.volume_up, color: Colors.blue),
+                        onPressed: _speakWord,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        iconSize: 24,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

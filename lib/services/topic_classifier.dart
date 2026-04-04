@@ -1,17 +1,65 @@
 class TopicClassifier {
   static const List<String> topics = [
-    'Đồ điện tử', // 0
-    'Đồ nội thất', // 1
-    'Động vật', // 2
-    'Thiên nhiên', // 3
-    'Công nghệ', // 4
-    'Học tập', // 5
-    'Đồ ăn', // 6
-    'Phương tiện', // 7
+    'Electronics',
+    'Furniture',
+    'Animals',
+    'Nature',
+    'Technology',
+    'Learning',
+    'Food',
+    'Vehicles',
+    'Household Items',
   ];
 
+  static String normalizeTopic(String topic) {
+    if (topic.contains('điện tử') || topic.contains('Ä‘iá»‡n tá»'))
+      return 'Electronics';
+    if (topic.contains('nội thất') || topic.contains('ná»™i tháº¥t'))
+      return 'Furniture';
+    if (topic.contains('Động vật') || topic.contains('Äá»™ng váºt'))
+      return 'Animals';
+    if (topic.contains('Thiên nhiên') || topic.contains('ThiÃªn nhiÃªn'))
+      return 'Nature';
+    if (topic.contains('Công nghệ') || topic.contains('CÃ´ng nghá»‡'))
+      return 'Technology';
+    if (topic.contains('Học tập') || topic.contains('Há»c táºp'))
+      return 'Learning';
+    if (topic.contains('Đồ ăn') || topic.contains('Äá»“ Äƒn')) return 'Food';
+    if (topic.contains('Phương tiện') || topic.contains('PhÆ°Æ¡ng tiá»‡n'))
+      return 'Vehicles';
+    if (topic.contains('gia đình') || topic.contains('Household'))
+      return 'Household Items';
+    return topic;
+  }
+
+  static String getVietnameseTopic(String topic) {
+    final norm = normalizeTopic(topic);
+    switch (norm) {
+      case 'Electronics':
+        return 'Đồ điện tử';
+      case 'Furniture':
+        return 'Đồ nội thất';
+      case 'Animals':
+        return 'Động vật';
+      case 'Nature':
+        return 'Thiên nhiên';
+      case 'Technology':
+        return 'Công nghệ';
+      case 'Learning':
+        return 'Học tập';
+      case 'Food':
+        return 'Đồ ăn';
+      case 'Vehicles':
+        return 'Phương tiện';
+      case 'Household Items':
+        return 'Vật dụng gia đình';
+      default:
+        return norm;
+    }
+  }
+
   static const Map<String, List<String>> keywords = {
-    'Đồ điện tử': [
+    'Electronics': [
       'phone',
       'tablet',
       'camera',
@@ -32,7 +80,7 @@ class TopicClassifier {
       'device',
       'gadget',
     ],
-    'Đồ nội thất': [
+    'Furniture': [
       'chair',
       'table',
       'bed',
@@ -48,19 +96,8 @@ class TopicClassifier {
       'cửa',
       'tủ',
       'sofa',
-      'nồi',
-      'chảo',
-      'kitchen',
-      'utensil',
-      'plate',
-      'cup',
-      'spoon',
-      'fork',
-      'dĩa',
-      'cốc',
-      'muỗng',
     ],
-    'Thiên nhiên': [
+    'Nature': [
       'tree',
       'flower',
       'mountain',
@@ -93,7 +130,7 @@ class TopicClassifier {
       'cỏ',
       'đá',
     ],
-    'Công nghệ': [
+    'Technology': [
       'computer',
       'phone',
       'laptop',
@@ -120,7 +157,7 @@ class TopicClassifier {
       'kỹ thuật số',
       'phần mềm',
     ],
-    'Đồ ăn': [
+    'Food': [
       'apple',
       'banana',
       'bread',
@@ -153,9 +190,8 @@ class TopicClassifier {
       'muối',
       'dầu',
       'bơ',
-      'đơ',
     ],
-    'Động vật': [
+    'Animals': [
       'cat',
       'dog',
       'bird',
@@ -188,10 +224,10 @@ class TopicClassifier {
       'cừu',
       'rắn',
       'côn trùng',
-      'bươm bướm',
+      'bướm',
       'nhện',
     ],
-    'Phương tiện': [
+    'Vehicles': [
       'car',
       'bus',
       'train',
@@ -222,7 +258,7 @@ class TopicClassifier {
       'xe cộ',
       'vận tải',
     ],
-    'Học tập': [
+    'Learning': [
       'study',
       'learn',
       'read',
@@ -255,21 +291,35 @@ class TopicClassifier {
       'kiểm tra',
       'kỳ thi',
     ],
+    'Household Items': [
+      'pot',
+      'pan',
+      'kitchen',
+      'utensil',
+      'plate',
+      'cup',
+      'spoon',
+      'fork',
+      'nồi',
+      'chảo',
+      'đĩa',
+      'cốc',
+      'muỗng',
+      'nhà bếp',
+      'đồ dùng',
+    ],
   };
 
-  /// Classify word vào topic tương ứng dựa trên keyword matching
   static String classifyWord(String word, String meaning) {
     final lowerWord = word.toLowerCase();
     final lowerMeaning = meaning.toLowerCase();
     final combined = '$lowerWord $lowerMeaning';
 
-    // Score cho mỗi topic
     final scores = <String, int>{};
     for (final topic in topics) {
       scores[topic] = 0;
     }
 
-    // Check keyword matching
     for (final topic in topics) {
       final topicKeywords = keywords[topic] ?? [];
       for (final keyword in topicKeywords) {
@@ -279,7 +329,6 @@ class TopicClassifier {
       }
     }
 
-    // Find topic với score cao nhất
     String bestTopic = topics[0];
     int maxScore = 0;
 
@@ -290,16 +339,14 @@ class TopicClassifier {
       }
     }
 
-    // Nếu không match keyword, return default
     return maxScore > 0 ? bestTopic : topics[0];
   }
 
-  /// Get topic index
   static int getTopicIndex(String topicName) {
-    return topics.indexOf(topicName);
+    final norm = normalizeTopic(topicName);
+    return topics.indexOf(norm);
   }
 
-  /// Get topic name from index
   static String getTopicName(int index) {
     return topics.isNotEmpty && index >= 0 && index < topics.length
         ? topics[index]

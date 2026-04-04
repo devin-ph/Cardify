@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/saved_card.dart';
 import '../services/saved_cards_repository.dart';
 
 class CalendarScreen extends StatefulWidget {

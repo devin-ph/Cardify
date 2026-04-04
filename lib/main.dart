@@ -8,14 +8,36 @@ import 'screens/main_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/xp_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: 'assets/.env');
-  await Supabase.initialize(
-    url: dotenv.get('SUPABASE_URL'),
-    anonKey: dotenv.get('SUPABASE_ANON_KEY'),
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await XPService.instance.init();
+  try {
+    await dotenv.load(fileName: 'assets/.env');
+  } catch (_) {
+    try {
+      await dotenv.load(fileName: '.env');
+    } catch (_) {
+      // Continue without a bundled .env file.
+    }
+  }
+
+  String? supabaseUrl;
+  String? supabaseAnonKey;
+  if (dotenv.isInitialized) {
+    supabaseUrl = dotenv.maybeGet('SUPABASE_URL');
+    supabaseAnonKey = dotenv.maybeGet('SUPABASE_ANON_KEY');
+  }
+
+  if (supabaseUrl?.trim().isNotEmpty == true &&
+      supabaseAnonKey?.trim().isNotEmpty == true) {
+    await Supabase.initialize(
+      url: supabaseUrl!.trim(),
+      anonKey: supabaseAnonKey!.trim(),
+    );
+  }
   runApp(const MyApp());
 }
 

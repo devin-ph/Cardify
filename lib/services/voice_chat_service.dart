@@ -45,12 +45,16 @@ class VoiceChatService {
   final http.Client _client;
 
   String _resolveChatEndpoint() {
-    final direct = dotenv.maybeGet('HF_CHAT_ENDPOINT')?.trim() ?? '';
+    final direct = dotenv.isInitialized
+        ? (dotenv.maybeGet('HF_CHAT_ENDPOINT')?.trim() ?? '')
+        : '';
     if (direct.isNotEmpty) {
       return direct;
     }
 
-    final analyze = dotenv.maybeGet('HF_ANALYZE_ENDPOINT')?.trim() ?? '';
+    final analyze = dotenv.isInitialized
+        ? (dotenv.maybeGet('HF_ANALYZE_ENDPOINT')?.trim() ?? '')
+        : '';
     if (analyze.isNotEmpty && analyze.endsWith('/analyze-image')) {
       return analyze.replaceFirst('/analyze-image', '/chat/respond');
     }
