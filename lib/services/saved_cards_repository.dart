@@ -505,7 +505,8 @@ class SavedCardsRepository {
     }
 
     if (client != null) {
-      final payload = { 'user_id': FirebaseAuth.instance.currentUser?.uid,
+      final payload = {
+        'user_id': FirebaseAuth.instance.currentUser?.uid,
         'word': word.trim(),
         'topic': topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
         'phonetic': phonetic.trim(),
@@ -521,7 +522,9 @@ class SavedCardsRepository {
         if (existingWord != null) {
           await client
               .from(_tableName)
-              .update(payload).eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '').ilike('word', normalized);
+              .update(payload)
+              .eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '')
+              .ilike('word', normalized);
         } else {
           await client.from(_tableName).upsert(payload);
         }
@@ -530,7 +533,9 @@ class SavedCardsRepository {
           try {
             await client
                 .from(_tableName)
-                .update(payload).eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '').ilike('word', normalized);
+                .update(payload)
+                .eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '')
+                .ilike('word', normalized);
           } catch (_) {
             // Ignore remote issues and keep the local save.
           }
@@ -692,7 +697,3 @@ class SavedCardsRepository {
     return _cardsController.stream;
   }
 }
-
-
-
-
