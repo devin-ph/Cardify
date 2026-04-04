@@ -3,6 +3,7 @@ import 'package:flip_card/flip_card.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,9 +28,12 @@ class FlashcardScreen extends StatefulWidget {
 class _FlashcardScreenState extends State<FlashcardScreen> {
   static const String _postponedWordsStoragePrefix =
       'practice_postponed_words_v1';
+  static const String _autoPlaySettingKey =
+      'profile_settings_auto_play_enabled';
   final FlutterTts _tts = FlutterTts();
   final SavedCardsRepository _repository = SavedCardsRepository.instance;
   final ImagePicker _imagePicker = ImagePicker();
+  Map<String, String> _datasetHintsByWord = <String, String>{};
   late final PageController _pageController;
   static const int _targetCardsPerTopic = 50;
   static const List<String> _commonPairs = [
@@ -239,6 +243,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   int selectedDeck = 0;
   int _currentCardIndex = 0;
   bool _isPracticeMode = false;
+  bool _autoPlayPronunciationEnabled = false;
+  String? _lastAutoSpokenCardKey;
   DateTime? _practiceStartedAt;
   String? _recentlyMarkedKnownWordKey;
   String? _recentlyPostponedWordKey;
@@ -642,10 +648,79 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.82);
+    _loadHintDataset();
     _initTts();
+    _loadAutoPlayPronunciationSetting();
     _ensureVocabularyCount();
     _repository.watchCards();
     _loadPostponedWordsForTopic(_currentDisplayTopic());
+  }
+
+  Future<void> _loadHintDataset() async {
+    try {
+      final raw = await rootBundle.loadString(
+        'assets/data/vocabulary_hints_vi.json',
+      );
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        return;
+      }
+
+      final items = decoded['items'];
+      if (items is! List) {
+        return;
+      }
+
+      final map = <String, String>{};
+      for (final item in items) {
+        if (item is! Map) {
+          continue;
+        }
+        final word = item['word']?.toString().trim().toLowerCase() ?? '';
+        final hint = item['hint_vi']?.toString().trim() ?? '';
+        if (word.isEmpty || hint.isEmpty) {
+          continue;
+        }
+        map[word] = hint;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _datasetHintsByWord = map;
+      });
+    } catch (_) {
+      // Keep app usable even when dataset file is unavailable.
+    }
+  }
+
+  String _hintForWord({required String word}) {
+    final key = word.trim().toLowerCase();
+    final datasetHint = _datasetHintsByWord[key];
+    if (datasetHint != null && datasetHint.trim().isNotEmpty) {
+      return datasetHint;
+    }
+    return 'Đang tải gợi ý...';
+  }
+
+  Future<void> _loadAutoPlayPronunciationSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    final persistedValue = prefs.getBool(_autoPlaySettingKey);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _autoPlayPronunciationEnabled = persistedValue ?? true;
+      _lastAutoSpokenCardKey = null;
+    });
+
+    if (!(_autoPlayPronunciationEnabled)) {
+      await _tts.stop();
+    }
   }
 
   String _currentDisplayTopic() {
@@ -787,6 +862,56 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     }
     await _tts.stop();
     await _tts.speak(word);
+  }
+
+  bool _hasCardImage(SavedCard card) {
+    final hasImageBytes =
+        card.imageBytes != null && card.imageBytes!.isNotEmpty;
+    final hasImageUrl =
+        card.imageUrl != null && card.imageUrl!.trim().isNotEmpty;
+    return hasImageBytes || hasImageUrl;
+  }
+
+  bool _isFlashcardUnlocked(Flashcard flashcard) {
+    return flashcard.isUnlocked;
+  }
+
+  String _lockedHintForFlashcard(Flashcard flashcard) {
+    final fromDataset =
+        _datasetHintsByWord[flashcard.word.trim().toLowerCase()];
+    if (fromDataset != null && fromDataset.trim().isNotEmpty) {
+      return fromDataset;
+    }
+
+    if (flashcard.lockedHint.trim().isNotEmpty) {
+      return flashcard.lockedHint.trim();
+    }
+
+    return 'Đang tải gợi ý...';
+  }
+
+  void _scheduleAutoSpeakCurrentCard(Flashcard? flashcard) {
+    if (!_autoPlayPronunciationEnabled || flashcard == null) {
+      return;
+    }
+
+    if (!_isFlashcardUnlocked(flashcard)) {
+      return;
+    }
+
+    final autoSpeakKey =
+        '${_isPracticeMode ? 'practice' : 'normal'}::${flashcard.word.trim().toLowerCase()}';
+    if (_lastAutoSpokenCardKey == autoSpeakKey) {
+      return;
+    }
+    _lastAutoSpokenCardKey = autoSpeakKey;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_autoPlayPronunciationEnabled) {
+        return;
+      }
+      _speakWord(flashcard.word);
+    });
   }
 
   void _closeWithPracticeResult(BuildContext context) {
@@ -1237,6 +1362,10 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               final savedCardsForTopic = cards
                   .where((card) => card.topic == displayTopic)
                   .toList();
+              final unlockedWordKeys = savedCardsForTopic
+                  .where(_hasCardImage)
+                  .map((card) => card.word.trim().toLowerCase())
+                  .toSet();
               final savedCardsByWord = {
                 for (final card in savedCardsForTopic)
                   card.word.trim().toLowerCase(): card,
@@ -1245,6 +1374,11 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               final flashcardsFromSaved = savedCardsForTopic
                   .map(
                     (card) => Flashcard(
+                      meaning: _displayMeaning(
+                        card.word,
+                        card.meaning,
+                        topic: displayTopic,
+                      ),
                       image: _resolveFlashcardImage(
                         word: card.word,
                         meaning: card.meaning,
@@ -1253,14 +1387,13 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                       ),
                       word: card.word,
                       phonetic: card.phonetic,
-                      meaning: _displayMeaning(
-                        card.word,
-                        card.meaning,
-                        topic: displayTopic,
-                      ),
                       example: _exampleForDisplay(card.word, card.example),
                       topic: card.topic,
                       imageBytes: card.imageBytes,
+                      isUnlocked: unlockedWordKeys.contains(
+                        card.word.trim().toLowerCase(),
+                      ),
+                      lockedHint: _hintForWord(word: card.word),
                     ),
                   )
                   .toList();
@@ -1277,6 +1410,11 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                 final key = sample.word.trim().toLowerCase();
                 if (!existingWords.contains(key)) {
                   mergedFlashcards.add(sample);
+                  final sampleMeaning = _displayMeaning(
+                    sample.word,
+                    sample.meaning,
+                    topic: displayTopic,
+                  );
                   mergedFlashcards[mergedFlashcards.length - 1] = Flashcard(
                     image: _resolveFlashcardImage(
                       word: sample.word,
@@ -1286,14 +1424,12 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                     ),
                     word: sample.word,
                     phonetic: sample.phonetic,
-                    meaning: _displayMeaning(
-                      sample.word,
-                      sample.meaning,
-                      topic: displayTopic,
-                    ),
+                    meaning: sampleMeaning,
                     example: _exampleForDisplay(sample.word, sample.example),
                     topic: displayTopic,
                     imageBytes: sample.imageBytes,
+                    isUnlocked: false,
+                    lockedHint: _hintForWord(word: sample.word),
                   );
                 }
               }
@@ -1326,6 +1462,10 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
               final currentWordKey = currentFlashcard?.word
                   .trim()
                   .toLowerCase();
+              final currentCardUnlocked =
+                  currentFlashcard != null &&
+                  _isFlashcardUnlocked(currentFlashcard);
+              _scheduleAutoSpeakCurrentCard(currentFlashcard);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1463,39 +1603,59 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                           : (layer == 1
                                                                 ? 0.92
                                                                 : 0.86),
-                                                      child: FlipCard(
-                                                        key: ValueKey(
-                                                          'stack-card-$cardIndex-${card.word}',
-                                                        ),
-                                                        direction: FlipDirection
-                                                            .HORIZONTAL,
-                                                        front: FlashcardFront(
-                                                          flashcard: card,
-                                                          isKnown: isKnown,
-                                                          isPostponed:
-                                                              isPostponed,
-                                                          onSpeak: () =>
-                                                              _speakWord(
-                                                                card.word,
+                                                      child:
+                                                          _isFlashcardUnlocked(
+                                                            card,
+                                                          )
+                                                          ? FlipCard(
+                                                              key: ValueKey(
+                                                                'stack-card-$cardIndex-${card.word}',
                                                               ),
-                                                          width:
-                                                              double.infinity,
-                                                          height: cardHeight,
-                                                        ),
-                                                        back: FlashcardBack(
-                                                          flashcard: card,
-                                                          isKnown: isKnown,
-                                                          isPostponed:
-                                                              isPostponed,
-                                                          onSpeak: () =>
-                                                              _speakWord(
-                                                                card.word,
+                                                              direction:
+                                                                  FlipDirection
+                                                                      .HORIZONTAL,
+                                                              front: FlashcardFront(
+                                                                flashcard: card,
+                                                                isKnown:
+                                                                    isKnown,
+                                                                isPostponed:
+                                                                    isPostponed,
+                                                                onSpeak: () =>
+                                                                    _speakWord(
+                                                                      card.word,
+                                                                    ),
+                                                                width: double
+                                                                    .infinity,
+                                                                height:
+                                                                    cardHeight,
                                                               ),
-                                                          width:
-                                                              double.infinity,
-                                                          height: cardHeight,
-                                                        ),
-                                                      ),
+                                                              back: FlashcardBack(
+                                                                flashcard: card,
+                                                                isKnown:
+                                                                    isKnown,
+                                                                isPostponed:
+                                                                    isPostponed,
+                                                                onSpeak: () =>
+                                                                    _speakWord(
+                                                                      card.word,
+                                                                    ),
+                                                                width: double
+                                                                    .infinity,
+                                                                height:
+                                                                    cardHeight,
+                                                              ),
+                                                            )
+                                                          : LockedFlashcardView(
+                                                              flashcard: card,
+                                                              width: double
+                                                                  .infinity,
+                                                              height:
+                                                                  cardHeight,
+                                                              hintText:
+                                                                  _lockedHintForFlashcard(
+                                                                    card,
+                                                                  ),
+                                                            ),
                                                     ),
                                                   ),
                                                 );
@@ -1585,37 +1745,56 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                         vertical: 10,
                                                       ),
                                                   child: Center(
-                                                    child: FlipCard(
-                                                      key: ValueKey(
-                                                        'slider-card-$index-${card.word}',
-                                                      ),
-                                                      direction: FlipDirection
-                                                          .HORIZONTAL,
-                                                      front: FlashcardFront(
-                                                        flashcard: card,
-                                                        isKnown: isKnown,
-                                                        isPostponed:
-                                                            isPostponed,
-                                                        onSpeak: () =>
-                                                            _speakWord(
-                                                              card.word,
+                                                    child:
+                                                        _isFlashcardUnlocked(
+                                                          card,
+                                                        )
+                                                        ? FlipCard(
+                                                            key: ValueKey(
+                                                              'slider-card-$index-${card.word}',
                                                             ),
-                                                        width: double.infinity,
-                                                        height: cardHeight,
-                                                      ),
-                                                      back: FlashcardBack(
-                                                        flashcard: card,
-                                                        isKnown: isKnown,
-                                                        isPostponed:
-                                                            isPostponed,
-                                                        onSpeak: () =>
-                                                            _speakWord(
-                                                              card.word,
+                                                            direction:
+                                                                FlipDirection
+                                                                    .HORIZONTAL,
+                                                            front: FlashcardFront(
+                                                              flashcard: card,
+                                                              isKnown: isKnown,
+                                                              isPostponed:
+                                                                  isPostponed,
+                                                              onSpeak: () =>
+                                                                  _speakWord(
+                                                                    card.word,
+                                                                  ),
+                                                              width: double
+                                                                  .infinity,
+                                                              height:
+                                                                  cardHeight,
                                                             ),
-                                                        width: double.infinity,
-                                                        height: cardHeight,
-                                                      ),
-                                                    ),
+                                                            back: FlashcardBack(
+                                                              flashcard: card,
+                                                              isKnown: isKnown,
+                                                              isPostponed:
+                                                                  isPostponed,
+                                                              onSpeak: () =>
+                                                                  _speakWord(
+                                                                    card.word,
+                                                                  ),
+                                                              width: double
+                                                                  .infinity,
+                                                              height:
+                                                                  cardHeight,
+                                                            ),
+                                                          )
+                                                        : LockedFlashcardView(
+                                                            flashcard: card,
+                                                            width:
+                                                                double.infinity,
+                                                            height: cardHeight,
+                                                            hintText:
+                                                                _lockedHintForFlashcard(
+                                                                  card,
+                                                                ),
+                                                          ),
                                                   ),
                                                 ),
                                               );
@@ -1651,7 +1830,9 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                         ),
                                                   ),
                                                   onPressed:
-                                                      currentFlashcard == null
+                                                      currentFlashcard ==
+                                                              null ||
+                                                          !currentCardUnlocked
                                                       ? null
                                                       : () async {
                                                           setState(() {
@@ -1715,7 +1896,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                         ),
                                                   ),
                                                   onPressed:
-                                                      currentWordKey == null
+                                                      currentWordKey == null ||
+                                                          !currentCardUnlocked
                                                       ? null
                                                       : () async {
                                                           setState(() {
@@ -1838,6 +2020,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
 }
 
 Flashcard _sampleFlashcard(String word, String meaning, {String image = ''}) {
+  final displayMeaning = _displayMeaning(word, meaning);
   return Flashcard(
     image: _resolveFlashcardImage(
       word: word,
@@ -1846,10 +2029,333 @@ Flashcard _sampleFlashcard(String word, String meaning, {String image = ''}) {
     ),
     word: word,
     phonetic: '/${word.toLowerCase()}/',
-    meaning: _displayMeaning(word, meaning),
-    example: 'V├¡ dß╗Ñ: $word',
+    meaning: displayMeaning,
+    example: 'Ví dụ: $word',
+    isUnlocked: false,
+    lockedHint: _buildVietnameseHint(word: word, meaning: displayMeaning),
   );
 }
+
+String _buildVietnameseHint({required String word, required String meaning}) {
+  final key = word.trim().toLowerCase();
+  final mappedHint = _vietnameseHintByWord[key];
+  if (mappedHint != null && mappedHint.trim().isNotEmpty) {
+    return mappedHint;
+  }
+
+  final displayMeaning = meaning.trim();
+  if (displayMeaning.isEmpty) {
+    return 'Gợi ý: hãy nghĩ đến từ tiếng Việt phù hợp với chủ đề này.';
+  }
+
+  final normalized = _normalizeVietnameseForHint(displayMeaning);
+  final firstLetter = _firstHintLetter(displayMeaning);
+  final suffix = firstLetter.isEmpty
+      ? ''
+      : ', bắt đầu bằng chữ "$firstLetter".';
+
+  if (_isAnimalWordKey(key) || _isAnimalMeaning(normalized)) {
+    if (normalized.contains('khi')) {
+      return 'Gợi ý: con vật leo trèo rất giỏi, thích ăn chuối.';
+    }
+    if (normalized.contains('voi')) {
+      return 'Gợi ý: con vật to lớn, có chiếc vòi rất dài.';
+    }
+    if (normalized.contains('meo') || normalized.contains('cho')) {
+      return 'Gợi ý: thú cưng rất quen thuộc trong nhiều gia đình.';
+    }
+    return 'Gợi ý: đây là tên một con vật$suffix';
+  }
+
+  if (_isVehicleMeaning(normalized)) {
+    return 'Gợi ý: đây là một phương tiện di chuyển$suffix';
+  }
+
+  if (_isColorMeaning(normalized)) {
+    return 'Gợi ý: đây là một màu sắc$suffix';
+  }
+
+  if (_isPlaceMeaning(normalized)) {
+    return 'Gợi ý: đây là một địa điểm hoặc không gian quen thuộc$suffix';
+  }
+
+  if (_isFoodMeaning(normalized)) {
+    return 'Gợi ý: đây là món ăn hoặc thực phẩm quen thuộc$suffix';
+  }
+
+  if (_isDeviceMeaning(normalized)) {
+    return 'Gợi ý: đây là thiết bị thường dùng trong học tập/sinh hoạt$suffix';
+  }
+
+  if (_isTimeMeaning(normalized)) {
+    return 'Gợi ý: đây là từ chỉ thời gian$suffix';
+  }
+
+  if (_isActionMeaning(normalized)) {
+    return 'Gợi ý: đây là từ mô tả một hành động$suffix';
+  }
+
+  if (_isAdjectiveMeaning(normalized)) {
+    return 'Gợi ý: đây là từ mô tả đặc điểm hoặc trạng thái$suffix';
+  }
+
+  return 'Gợi ý: từ này thuộc nhóm từ vựng quen thuộc$suffix';
+}
+
+String _normalizeVietnameseForHint(String value) {
+  var text = value.toLowerCase().trim();
+  const from =
+      'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ';
+  const to =
+      'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuuuyyyyyd';
+  for (var i = 0; i < from.length; i++) {
+    text = text.replaceAll(from[i], to[i]);
+  }
+  return text;
+}
+
+String _firstHintLetter(String value) {
+  final trimmed = value.trim();
+  for (final rune in trimmed.runes) {
+    final char = String.fromCharCode(rune);
+    if (RegExp(r'[A-Za-zÀ-ỹà-ỹĐđ]').hasMatch(char)) {
+      return char.toUpperCase();
+    }
+  }
+  return '';
+}
+
+bool _isAnimalMeaning(String normalizedMeaning) {
+  const animalTokens = [
+    'meo',
+    'chim',
+    'tho',
+    'ho',
+    'su tu',
+    'voi',
+    'khi',
+    'ngua',
+    'heo',
+    'cuu',
+    'vit',
+    'ga',
+    'buom',
+    'gau',
+    'soi',
+    'cao',
+    'huou',
+    'lua',
+    'vet',
+    'ca heo',
+    'ca voi',
+    'ca map',
+    'kien',
+  ];
+  return animalTokens.any((token) => normalizedMeaning == token);
+}
+
+bool _isAnimalWordKey(String key) {
+  const animalWordKeys = [
+    'cat',
+    'dog',
+    'bird',
+    'rabbit',
+    'tiger',
+    'lion',
+    'elephant',
+    'monkey',
+    'horse',
+    'cow',
+    'pig',
+    'sheep',
+    'duck',
+    'chicken',
+    'butterfly',
+    'bear',
+    'wolf',
+    'fox',
+    'deer',
+    'goat',
+    'donkey',
+    'eagle',
+    'parrot',
+    'dolphin',
+    'whale',
+    'shark',
+    'ant',
+  ];
+  return animalWordKeys.contains(key);
+}
+
+bool _isVehicleMeaning(String normalizedMeaning) {
+  return normalizedMeaning.startsWith('xe ') ||
+      normalizedMeaning.contains('tau') ||
+      normalizedMeaning.contains('may bay') ||
+      normalizedMeaning.contains('thuyen') ||
+      normalizedMeaning.contains('phuong tien');
+}
+
+bool _isColorMeaning(String normalizedMeaning) {
+  return normalizedMeaning.startsWith('mau ');
+}
+
+bool _isPlaceMeaning(String normalizedMeaning) {
+  const placeTokens = [
+    'nha',
+    'phong',
+    'truong hoc',
+    'benh vien',
+    'van phong',
+    'thu vien',
+    'thanh pho',
+    'ngoi lang',
+    'duong pho',
+    'khu vuon',
+    'cong vien',
+    'cho',
+  ];
+  return placeTokens.any((token) => normalizedMeaning.contains(token));
+}
+
+bool _isFoodMeaning(String normalizedMeaning) {
+  const foodTokens = [
+    'qua ',
+    'thit',
+    'com',
+    'mi',
+    'sup',
+    'sua',
+    'pho mai',
+    'duong',
+    'muoi',
+    'bo',
+    'rau',
+    'ca',
+    'trung',
+    'tra',
+    'ca phe',
+    'mat ong',
+  ];
+  return foodTokens.any((token) => normalizedMeaning.contains(token));
+}
+
+bool _isDeviceMeaning(String normalizedMeaning) {
+  return normalizedMeaning.startsWith('may ') ||
+      normalizedMeaning.contains('dien thoai') ||
+      normalizedMeaning.contains('ban phim') ||
+      normalizedMeaning.contains('man hinh') ||
+      normalizedMeaning.contains('mang internet') ||
+      normalizedMeaning.contains('phan mem') ||
+      normalizedMeaning.contains('phan cung');
+}
+
+bool _isTimeMeaning(String normalizedMeaning) {
+  const timeTokens = [
+    'gio',
+    'phut',
+    'giay',
+    'ngay',
+    'tuan',
+    'thang',
+    'nam',
+    'buoi',
+    'hom nay',
+    'hom qua',
+    'ngay mai',
+    'lich',
+    'mua',
+    'the ky',
+    'thap ky',
+  ];
+  return timeTokens.any((token) => normalizedMeaning.contains(token));
+}
+
+bool _isActionMeaning(String normalizedMeaning) {
+  const actionTokens = [
+    'chay',
+    'di bo',
+    'nhay',
+    'boi',
+    'hat',
+    'doc',
+    'viet',
+    'nau an',
+    'hoc',
+    'lam viec',
+    'ngu',
+    'thuc day',
+    'choi',
+    'lang nghe',
+    'xem',
+    'suy nghi',
+    'xay dung',
+    'sua chua',
+    'lai xe',
+    'du lich',
+    'luyen tap',
+  ];
+  return actionTokens.any((token) => normalizedMeaning.contains(token));
+}
+
+bool _isAdjectiveMeaning(String normalizedMeaning) {
+  const adjectiveTokens = [
+    'lon',
+    'nho',
+    'gan',
+    'xa',
+    'mo',
+    'dong',
+    'de',
+    'kho',
+    'nhanh',
+    'cham',
+    'nong',
+    'lanh',
+    'vui',
+    'buon',
+    'manh',
+    'yeu',
+    'sach',
+    'ban',
+    'an toan',
+    'nguy hiem',
+    'quan trong',
+    'dac biet',
+    'don gian',
+    'phuc tap',
+    'som',
+    'muon',
+    'tuoi',
+    'kho',
+    'uot',
+    'yen tinh',
+    'on ao',
+    'hien dai',
+    'co dien',
+    'cong cong',
+    'rieng tu',
+    'co san',
+    'thieu',
+    'dung',
+    'sai',
+    'huu ich',
+    'pho bien',
+  ];
+  return adjectiveTokens.any((token) => normalizedMeaning.contains(token));
+}
+
+const Map<String, String> _vietnameseHintByWord = {
+  'cat': 'Con gì kêu meo meo?',
+  'dog': 'Con gì kêu gâu gâu?',
+  'bird': 'Con gì biết bay và hót?',
+  'computer': 'Thiết bị nào dùng để học và làm việc?',
+  'phone': 'Đồ dùng nào để gọi điện và nhắn tin?',
+  'apple': 'Loại quả nào thường có màu đỏ hoặc xanh?',
+  'car': 'Phương tiện nào chạy bốn bánh?',
+  'chair': 'Đồ vật nào dùng để ngồi?',
+  'table': 'Đồ vật nào dùng để đặt đồ ăn?',
+  'sun': 'Nguồn sáng lớn nhất ban ngày là gì?',
+};
 
 const Map<String, String> _vietnameseMeaningByWord = {
   'chair': 'Ghế',
@@ -2274,6 +2780,8 @@ class Flashcard {
   final String meaning;
   final String example;
   final String topic;
+  final bool isUnlocked;
+  final String lockedHint;
 
   Flashcard({
     required this.image,
@@ -2283,7 +2791,76 @@ class Flashcard {
     required this.meaning,
     required this.example,
     this.topic = '',
+    this.isUnlocked = false,
+    this.lockedHint = '',
   });
+}
+
+class LockedFlashcardView extends StatelessWidget {
+  const LockedFlashcardView({
+    super.key,
+    required this.flashcard,
+    required this.hintText,
+    this.width = 320,
+    this.height = 420,
+  });
+
+  final Flashcard flashcard;
+  final String hintText;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Container(
+        width: width,
+        height: height,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade100, Colors.blue.shade200],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.question_mark,
+                size: 66,
+                color: Color(0xFF0A5DB6),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              flashcard.meaning,
+              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              hintText,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.black54,
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class FlashcardFront extends StatelessWidget {

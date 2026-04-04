@@ -7,9 +7,9 @@ class ProfileIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.account_circle, size: 32, color: Colors.blue),
+      icon: const Icon(Icons.settings_rounded, size: 30, color: Colors.blue),
       onPressed: onTap,
-      tooltip: 'Hồ sơ',
+      tooltip: 'Cài đặt',
     );
   }
 }
