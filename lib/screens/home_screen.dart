@@ -1,11 +1,15 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/saved_card.dart';
 import '../services/saved_cards_repository.dart';
+import '../services/xp_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -83,6 +87,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Timer? _bannerTimer;
   int _bannerIndex = 0;
   final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier(0.0);
+    static const String _dailyMissionClaimDateKey =
+      'home_daily_mission_claim_date_v1';
+    static const String _dailyMissionClaimedIdsKey =
+      'home_daily_mission_claimed_ids_v1';
+    Set<String> _claimedMissionIdsToday = <String>{};
+    bool _missionStateLoaded = false;
+    bool _isAutoClaimingMission = false;
 
   @override
   void initState() {
@@ -96,7 +107,106 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 3000),
     )..repeat();
+    _loadMissionState();
     _startBannerAutoSlide();
+  }
+
+  String _todayKey() {
+    final now = DateTime.now();
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$mm-$dd';
+  }
+
+  Future<void> _loadMissionState() async {
+    final todayKey = _todayKey();
+    final prefs = await SharedPreferences.getInstance();
+
+    final localDate = prefs.getString(_dailyMissionClaimDateKey);
+    final localIds = prefs.getStringList(_dailyMissionClaimedIdsKey) ??
+        const <String>[];
+
+    Set<String> claimed = <String>{};
+    if (localDate == todayKey) {
+      claimed = localIds.toSet();
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final profile = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final data = profile.data();
+        final remoteDay = data?['daily_mission_claim_day'];
+        final remoteIds = data?['daily_mission_claimed_ids'];
+        if (remoteDay is String &&
+            remoteDay == todayKey &&
+            remoteIds is List) {
+          claimed = remoteIds
+              .map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toSet();
+        }
+      } catch (_) {
+        // Keep mission reward flow using local state when cloud read fails.
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _claimedMissionIdsToday = claimed;
+      _missionStateLoaded = true;
+    });
+  }
+
+  Future<void> _persistMissionState() async {
+    final todayKey = _todayKey();
+    final values = _claimedMissionIdsToday.toList()..sort();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_dailyMissionClaimDateKey, todayKey);
+    await prefs.setStringList(_dailyMissionClaimedIdsKey, values);
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'daily_mission_claim_day': todayKey,
+        'daily_mission_claimed_ids': values,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Keep local mission rewards when cloud write fails.
+    }
+  }
+
+  Future<void> _claimMissionReward(String missionId, int rewardXp) async {
+    if (!_missionStateLoaded ||
+        _isAutoClaimingMission ||
+        _claimedMissionIdsToday.contains(missionId)) {
+      return;
+    }
+
+    _isAutoClaimingMission = true;
+    try {
+      await XPService.instance.addXP(rewardXp);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _claimedMissionIdsToday.add(missionId);
+      });
+      await _persistMissionState();
+    } finally {
+      _isAutoClaimingMission = false;
+    }
   }
 
   void _startBannerAutoSlide() {
@@ -636,32 +746,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             )
             .length;
 
-        final dailyMissions = [
+        final List<Map<String, dynamic>> dailyMissions = [
           {
+            'id': 'review',
             'title': 'Hoàn thành bài ôn tập',
             'xp': '+100 XP',
+            'rewardXp': 100,
             'current': fullyLearnedSets,
             'total': 1,
             'color': const Color(0xFF06C0FF),
             'icon': Icons.style_rounded,
           },
           {
+            'id': 'scan5',
             'title': 'Quét 5 đồ vật mới',
             'xp': '+50 XP',
+            'rewardXp': 50,
             'current': scannedToday,
             'total': 5,
             'color': const Color(0xFF7E6BFF),
             'icon': Icons.camera_alt_rounded,
           },
           {
+            'id': 'learn15',
             'title': 'Học 15 từ vựng mới',
             'xp': '+150 XP',
+            'rewardXp': 150,
             'current': wordsToday,
             'total': 15,
             'color': const Color(0xFFFF7F45),
             'icon': Icons.menu_book_rounded,
           },
         ];
+
+        if (_missionStateLoaded && !_isAutoClaimingMission) {
+          final claimable = dailyMissions
+              .where((mission) {
+                final id = mission['id'] as String;
+                final current = mission['current'] as int;
+                final total = mission['total'] as int;
+                return current >= total && !_claimedMissionIdsToday.contains(id);
+              })
+              .toList();
+
+          if (claimable.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              for (final mission in claimable) {
+                if (!mounted) {
+                  return;
+                }
+                await _claimMissionReward(
+                  mission['id'] as String,
+                  mission['rewardXp'] as int,
+                );
+              }
+            });
+          }
+        }
 
         return _FrostedPanel(
           title: 'Nhiệm vụ hằng ngày',
@@ -670,17 +811,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           onActionTap: null,
           child: Column(
             children: dailyMissions.map((mission) {
+              final missionId = mission['id'] as String;
               final color = mission['color'] as Color;
               final current = mission['current'] as int;
               final total = mission['total'] as int;
               final isCompleted = current >= total;
+              final isClaimed = _claimedMissionIdsToday.contains(missionId);
               final displayColor = isCompleted
                   ? const Color(0xFF6EE7B7)
                   : color;
               final progress = (current / total).clamp(0.0, 1.0);
 
               return _BounceTap(
-                onTap: () {},
+                onTap: () {
+                  if (isCompleted && !isClaimed) {
+                    unawaited(
+                      _claimMissionReward(
+                        missionId,
+                        mission['rewardXp'] as int,
+                      ),
+                    );
+                  }
+                },
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(12),
@@ -771,10 +923,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       SizedBox(
                         width: 60,
                         child: Text(
-                          mission['xp'] as String,
+                          isClaimed ? 'Đã nhận' : mission['xp'] as String,
                           textAlign: TextAlign.right,
                           style: TextStyle(
-                            color: isCompleted ? Colors.grey.shade500 : color,
+                            color: isClaimed
+                                ? const Color(0xFF10B981)
+                                : (isCompleted
+                                    ? Colors.grey.shade500
+                                    : color),
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
                           ),

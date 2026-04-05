@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -8,17 +9,17 @@ import 'screens/main_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/firestore_sync_status.dart';
 import 'services/xp_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await XPService.instance.init();
   try {
-    await dotenv.load(fileName: 'assets/.env');
+    await dotenv.load(fileName: '.env');
   } catch (_) {
     try {
-      await dotenv.load(fileName: '.env');
+      await dotenv.load(fileName: 'assets/.env');
     } catch (_) {
       // Continue without a bundled .env file.
     }
@@ -82,6 +83,95 @@ class _AppBootstrapState extends State<_AppBootstrap> {
   static const String _onboardingSeenKey = 'onboarding_seen_v1';
   static const String _appStartedAtKey = 'app_started_at_v1';
 
+  DocumentReference<Map<String, dynamic>>? _profileDoc() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return FirebaseFirestore.instance.collection('users').doc(user.uid);
+  }
+
+  Future<void> _syncBootstrapStateFromFirebase() async {
+    final docRef = _profileDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportReading(
+        path: 'users/${docRef.id}',
+        reason: 'đồng bộ onboarding/app_started_at khi mở app',
+      );
+      final snapshot = await docRef.get();
+      final data = snapshot.data();
+      if (data == null) {
+        await _pushBootstrapStateToFirebase();
+        return;
+      }
+
+      final remoteOnboarding = data['onboarding_seen'];
+      final remoteStartedAt = data['app_started_at'];
+
+      final preferences = _preferences ?? await SharedPreferences.getInstance();
+      _preferences = preferences;
+
+      if (remoteOnboarding is bool) {
+        await preferences.setBool(_onboardingSeenKey, remoteOnboarding);
+        _shouldShowOnboarding = !remoteOnboarding;
+      }
+      if (remoteStartedAt is String && remoteStartedAt.trim().isNotEmpty) {
+        await preferences.setString(_appStartedAtKey, remoteStartedAt);
+      }
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.id}',
+        message: 'Đã đọc trạng thái bootstrap từ Firestore',
+      );
+    } catch (error) {
+      // Keep local bootstrap flow working when cloud read fails.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.id}',
+        operation: 'read bootstrap state',
+        error: error,
+      );
+    }
+  }
+
+  Future<void> _pushBootstrapStateToFirebase() async {
+    final docRef = _profileDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    final preferences = _preferences ?? await SharedPreferences.getInstance();
+    _preferences = preferences;
+    final onboardingSeen = preferences.getBool(_onboardingSeenKey) ?? false;
+    final appStartedAt = preferences.getString(_appStartedAtKey);
+
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/${docRef.id}',
+        reason: 'ghi onboarding/app_started_at',
+      );
+      await docRef.set({
+        'onboarding_seen': onboardingSeen,
+        if (appStartedAt != null && appStartedAt.isNotEmpty)
+          'app_started_at': appStartedAt,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.id}',
+        message: 'Đã ghi bootstrap state lên Firestore',
+      );
+    } catch (error) {
+      // Keep local bootstrap flow working when cloud write fails.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.id}',
+        operation: 'write bootstrap state',
+        error: error,
+      );
+    }
+  }
+
   Future<void> _initializeFirebase() {
     return Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -90,14 +180,17 @@ class _AppBootstrapState extends State<_AppBootstrap> {
 
   Future<void> _initializeAppState() async {
     await _initializeFirebase();
+    await XPService.instance.init();
     _preferences = await SharedPreferences.getInstance();
     _shouldShowOnboarding =
         !(_preferences?.getBool(_onboardingSeenKey) ?? false);
+    await _syncBootstrapStateFromFirebase();
   }
 
   Future<void> _markAppStarted() async {
     final preferences = _preferences ?? await SharedPreferences.getInstance();
     if (preferences.containsKey(_appStartedAtKey)) {
+      await _pushBootstrapStateToFirebase();
       return;
     }
 
@@ -113,6 +206,8 @@ class _AppBootstrapState extends State<_AppBootstrap> {
     setState(() {
       _preferences = preferences;
     });
+
+    await _pushBootstrapStateToFirebase();
   }
 
   Future<void> _markOnboardingComplete() async {
@@ -127,6 +222,8 @@ class _AppBootstrapState extends State<_AppBootstrap> {
       _shouldShowOnboarding = false;
       _preferences = preferences;
     });
+
+    await _pushBootstrapStateToFirebase();
   }
 
   @override

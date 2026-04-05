@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:cardify_ai_english_learning_app/screens/deck_list_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/analysis_result.dart';
+import '../services/firestore_sync_status.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/xp_service.dart';
 import '../widgets/ai_voice_chat_dialog.dart';
@@ -26,42 +30,96 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   bool _isDictionarySearching = false;
   String _userName = 'Explorer';
+  String _userEmail = 'explorer@cardify.ai';
   int _streak = 0;
   int _experience = 0;
   int _level = 1;
   int _nextLevelExperience = 1000;
   final SavedCardsRepository _cardsRepository = SavedCardsRepository.instance;
+  StreamSubscription<firebase_auth.User?>? _authSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _profileSubscription;
+  String? _boundProfileUid;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _authSubscription = firebase_auth.FirebaseAuth.instance
+        .authStateChanges()
+        .listen((_) {
+          _bindUserProfileStream();
+        });
+    _bindUserProfileStream();
   }
 
-  Future<void> _loadUserData() async {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-      final data = await Supabase.instance.client
-          .from('user_profiles')
-          .select()
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (data != null && mounted) {
-        setState(() {
-          _userName = data['username'] as String? ?? 'Explorer';
-          _streak = (data['streak'] as num?)?.toInt() ?? 0;
-          _experience = (data['xp'] as num?)?.toInt() ?? 0;
-          _level = (data['level'] as num?)?.toInt() ?? 1;
-          _nextLevelExperience =
-              (data['next_level_xp'] as num?)?.toInt() ?? 1000;
-        });
-      }
-    } catch (e) {
-      // Bỏ qua lỗi nếu chưa có table hoặc data
-      debugPrint('Lỗi load data: $e');
+  void _bindUserProfileStream() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _profileSubscription?.cancel();
+      _profileSubscription = null;
+      _boundProfileUid = null;
+      return;
     }
+
+    if (_boundProfileUid == user.uid && _profileSubscription != null) {
+      return;
+    }
+
+    _profileSubscription?.cancel();
+    _boundProfileUid = user.uid;
+
+    FirestoreSyncStatus.instance.reportReading(
+      path: 'users/${user.uid}',
+      reason: 'theo dõi realtime hồ sơ người dùng',
+    );
+
+    _profileSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists) {
+            return;
+          }
+          final data = snapshot.data() ?? <String, dynamic>{};
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _userName = data['display_name']?.toString().trim().isNotEmpty ==
+                    true
+                ? data['display_name'].toString().trim()
+                : 'Explorer';
+            _userEmail = data['email']?.toString().trim().isNotEmpty == true
+              ? data['email'].toString().trim()
+              : (user.email ?? _userEmail);
+            _streak = (data['streak'] as num?)?.toInt() ?? _streak;
+            _experience = (data['xp'] as num?)?.toInt() ?? _experience;
+            _level = (data['level'] as num?)?.toInt() ?? _level;
+            _nextLevelExperience =
+                (data['next_level_xp'] as num?)?.toInt() ??
+                _nextLevelExperience;
+          });
+
+          FirestoreSyncStatus.instance.reportSuccess(
+            path: 'users/${user.uid}',
+            message: 'Đã cập nhật hồ sơ từ Firestore realtime',
+          );
+        }, onError: (Object error) {
+          FirestoreSyncStatus.instance.reportError(
+            path: 'users/${user.uid}',
+            operation: 'listen main profile',
+            error: error,
+          );
+        });
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.cancel();
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   void _setScreenIndex(int index) {
@@ -100,7 +158,7 @@ class _MainScreenState extends State<MainScreen> {
       MaterialPageRoute(
         builder: (context) => ProfileSettingsScreen(
           name: _userName,
-          email: 'explorer@cardify.ai',
+          email: _userEmail,
         ),
       ),
     );

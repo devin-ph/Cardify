@@ -3,12 +3,15 @@ import 'package:flip_card/flip_card.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/saved_card.dart';
+import '../services/firestore_sync_status.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/topic_classifier.dart';
 
@@ -34,6 +37,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   final FlutterTts _tts = FlutterTts();
   final SavedCardsRepository _repository = SavedCardsRepository.instance;
   final ImagePicker _imagePicker = ImagePicker();
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   Map<String, String> _datasetHintsByWord = <String, String>{};
   List<Map<String, dynamic>> _datasetItems = [];
   late final PageController _pageController;
@@ -725,6 +729,52 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     if (!(_autoPlayPronunciationEnabled)) {
       await _tts.stop();
     }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportReading(
+        path: 'users/${user.uid}',
+        reason: 'đọc settings_auto_play_enabled',
+      );
+      final profileDoc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final remoteAutoPlay =
+          profileDoc.data()?['settings_auto_play_enabled'];
+      if (remoteAutoPlay is bool) {
+        if (mounted) {
+          setState(() {
+            _autoPlayPronunciationEnabled = remoteAutoPlay;
+          });
+        }
+        await prefs.setBool(_autoPlaySettingKey, remoteAutoPlay);
+      } else if (persistedValue != null) {
+        FirestoreSyncStatus.instance.reportWriting(
+          path: 'users/${user.uid}',
+          reason: 'ghi settings_auto_play_enabled mặc định',
+        );
+        await _firestore.collection('users').doc(user.uid).set({
+          'settings_auto_play_enabled': persistedValue,
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${user.uid}',
+        message: 'Đồng bộ auto play với Firestore thành công',
+      );
+    } catch (error) {
+      // Keep local setting behavior if cloud access fails.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${user.uid}',
+        operation: 'sync auto play setting',
+        error: error,
+      );
+    }
   }
 
   String _currentDisplayTopic() {
@@ -733,6 +783,19 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
 
   String _postponedStorageKey(String topic) {
     return '$_postponedWordsStoragePrefix::${topic.trim()}';
+  }
+
+  DocumentReference<Map<String, dynamic>>? _postponedDoc(String topic) {
+    final user = FirebaseAuth.instance.currentUser;
+    final normalizedTopic = topic.trim();
+    if (user == null || normalizedTopic.isEmpty) {
+      return null;
+    }
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('postponed_words')
+        .doc(normalizedTopic);
   }
 
   Future<void> _loadPostponedWordsForTopic(String topic) async {
@@ -774,8 +837,131 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
       });
 
       await prefs.setStringList(_postponedStorageKey(normalizedTopic), cleaned);
-    } catch (_) {
+
+      final docRef = _postponedDoc(normalizedTopic);
+      if (docRef == null) {
+        return;
+      }
+
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          FirestoreSyncStatus.instance.reportReading(
+            path: 'users/${currentUser.uid}/postponed_words/$normalizedTopic',
+            reason: 'đọc postponed words theo topic',
+          );
+        }
+        final snap = await docRef.get();
+        final remoteWords = snap.data()?['words'];
+        if (remoteWords is List) {
+          final remoteCleaned = <String>[];
+          for (final item in remoteWords) {
+            final normalizedKey = item.toString().trim().toLowerCase();
+            if (normalizedKey.isEmpty) {
+              continue;
+            }
+            final isKnown = _repository.isKnown(
+              normalizedKey,
+              topic: normalizedTopic,
+            );
+            if (!isKnown && !remoteCleaned.contains(normalizedKey)) {
+              remoteCleaned.add(normalizedKey);
+            }
+          }
+
+          if (mounted) {
+            setState(() {
+              _postponedWordKeys
+                ..clear()
+                ..addAll(remoteCleaned);
+              _loadedPostponedTopic = normalizedTopic;
+            });
+          }
+          await prefs.setStringList(
+            _postponedStorageKey(normalizedTopic),
+            remoteCleaned,
+          );
+          return;
+        }
+
+        if (cleaned.isNotEmpty) {
+          if (currentUser != null) {
+            FirestoreSyncStatus.instance.reportWriting(
+              path:
+                  'users/${currentUser.uid}/postponed_words/$normalizedTopic',
+              reason: 'ghi postponed words từ local cache',
+            );
+          }
+          await docRef.set({
+            'topic': normalizedTopic,
+            'words': cleaned,
+            'updated_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+        if (currentUser == null) {
+          return;
+        }
+
+        final legacyDoc = await _firestore
+            .collection('user_postponed_words')
+            .doc(currentUser.uid)
+            .collection('topics')
+            .doc(normalizedTopic)
+            .get();
+        final legacyWords = legacyDoc.data()?['words'];
+        final userTopicsLegacyDoc = await _firestore
+            .collection('users')
+            .doc(currentUser.uid)
+            .collection('topics')
+            .doc(normalizedTopic)
+            .get();
+        final userTopicsLegacyWords = userTopicsLegacyDoc.data()?['words'];
+        if (remoteWords == null && legacyWords is List) {
+          final migrated = legacyWords
+              .map((item) => item.toString().trim().toLowerCase())
+              .where((item) => item.isNotEmpty)
+              .toList();
+          if (migrated.isNotEmpty) {
+            await docRef.set({
+              'topic': normalizedTopic,
+              'words': migrated,
+              'updated_at': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+        } else if (remoteWords == null && userTopicsLegacyWords is List) {
+          final migrated = userTopicsLegacyWords
+              .map((item) => item.toString().trim().toLowerCase())
+              .where((item) => item.isNotEmpty)
+              .toList();
+          if (migrated.isNotEmpty) {
+            await docRef.set({
+              'topic': normalizedTopic,
+              'words': migrated,
+              'updated_at': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          }
+        }
+        FirestoreSyncStatus.instance.reportSuccess(
+          path: 'users/${currentUser.uid}/postponed_words/$normalizedTopic',
+          message: 'Đã đồng bộ postponed words từ Firestore',
+        );
+      } catch (error) {
+        // Ignore cloud sync failures and keep local mode.
+        final currentUser = FirebaseAuth.instance.currentUser;
+        final uid = currentUser?.uid ?? '{uid}';
+        FirestoreSyncStatus.instance.reportError(
+          path: 'users/$uid/postponed_words/$normalizedTopic',
+          operation: 'read postponed words',
+          error: error,
+        );
+      }
+    } catch (error) {
       // Keep practice usable even if local storage fails.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/{uid}/postponed_words/$normalizedTopic',
+        operation: 'load postponed words',
+        error: error,
+      );
     } finally {
       _loadingPostponedWords = false;
     }
@@ -793,8 +979,36 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         _postponedStorageKey(normalizedTopic),
         List<String>.from(_postponedWordKeys),
       );
-    } catch (_) {
+
+      final docRef = _postponedDoc(normalizedTopic);
+      if (docRef != null) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          FirestoreSyncStatus.instance.reportWriting(
+            path: 'users/${currentUser.uid}/postponed_words/$normalizedTopic',
+            reason: 'cập nhật postponed words do người dùng thay đổi',
+          );
+        }
+        await docRef.set({
+          'topic': normalizedTopic,
+          'words': List<String>.from(_postponedWordKeys),
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (currentUser != null) {
+          FirestoreSyncStatus.instance.reportSuccess(
+            path: 'users/${currentUser.uid}/postponed_words/$normalizedTopic',
+            message: 'Đã ghi postponed words lên Firestore',
+          );
+        }
+      }
+    } catch (error) {
       // Ignore persistence errors to avoid blocking user actions.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/{uid}/postponed_words/$normalizedTopic',
+        operation: 'write postponed words',
+        error: error,
+      );
     }
   }
 

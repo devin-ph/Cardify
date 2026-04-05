@@ -270,54 +270,61 @@ class _AchievementsScreenState extends State<AchievementsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFE9F4FF), Color(0xFFDFF0FF), Color(0xFFF4EBFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        children: [
-          AnimatedBuilder(
-            animation: _ambientController,
-            builder: (context, child) {
-              final value = _ambientController.value;
-              return Stack(
-                children: [
-                  _AmbientOrb(
-                    top: -50 + value * 30,
-                    left: -40,
-                    size: 220,
-                    color: const Color(0xFF38BDF8),
-                  ),
-                  _AmbientOrb(
-                    top: 220 - value * 24,
-                    right: -70,
-                    size: 260,
-                    color: const Color(0xFF8B5CF6),
-                  ),
-                  _AmbientOrb(
-                    bottom: 60 + value * 20,
-                    left: -40,
-                    size: 180,
-                    color: const Color(0xFFFF4D95),
-                  ),
-                ],
-              );
-            },
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        XPService.instance.xpNotifier,
+        XPService.instance.streakNotifier,
+        SavedCardsRepository.instance.cardsNotifier,
+      ]),
+      builder: (context, _) {
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFE9F4FF), Color(0xFFDFF0FF), Color(0xFFF4EBFF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
-          SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      _buildHeader(),
-                      const SizedBox(height: 14),
+          child: Stack(
+            children: [
+              AnimatedBuilder(
+                animation: _ambientController,
+                builder: (context, child) {
+                  final value = _ambientController.value;
+                  return Stack(
+                    children: [
+                      _AmbientOrb(
+                        top: -50 + value * 30,
+                        left: -40,
+                        size: 220,
+                        color: const Color(0xFF38BDF8),
+                      ),
+                      _AmbientOrb(
+                        top: 220 - value * 24,
+                        right: -70,
+                        size: 260,
+                        color: const Color(0xFF8B5CF6),
+                      ),
+                      _AmbientOrb(
+                        bottom: 60 + value * 20,
+                        left: -40,
+                        size: 180,
+                        color: const Color(0xFFFF4D95),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              SafeArea(
+                child: CustomScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          _buildHeader(),
+                          const SizedBox(height: 14),
                       _buildLeaguePanel(), // Leo Tháp
                       const SizedBox(height: 14),
                       _buildGhostPanel(), // Bóng ma
@@ -325,14 +332,16 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                       _buildOasisPanel(), // Khu vườn
                       const SizedBox(height: 14),
                       _buildBadgePanel(), // Bộ sưu tập
-                    ]),
-                  ),
+                        ]),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

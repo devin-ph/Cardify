@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../services/firestore_sync_status.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   final String name;
@@ -41,12 +44,56 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   bool _dailyReminderEnabled = true;
   bool _compactLayoutEnabled = false;
 
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
+
   @override
   void initState() {
     super.initState();
     _name = widget.name;
     _email = widget.email;
     _loadPersistedSettings();
+  }
+
+  DocumentReference<Map<String, dynamic>>? _profileDoc() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return _firestore.collection('users').doc(user.uid);
+  }
+
+  Future<void> _persistSettingsToFirebase() async {
+    final docRef = _profileDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/${docRef.id}',
+        reason: 'ghi cài đặt hồ sơ người dùng',
+      );
+      await docRef.set({
+        'display_name': _name,
+        'settings_ai_hints_enabled': _aiHintsEnabled,
+        'settings_auto_play_enabled': _autoPlayPronunciation,
+        'settings_ai_chat_narrator_enabled': _aiChatNarratorEnabled,
+        'settings_daily_reminder': _dailyReminderEnabled,
+        'settings_compact_layout': _compactLayoutEnabled,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.id}',
+        message: 'Đã cập nhật cài đặt hồ sơ trên Firestore',
+      );
+    } catch (error) {
+      // Keep settings update non-blocking when cloud is unavailable.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.id}',
+        operation: 'write profile settings',
+        error: error,
+      );
+    }
   }
 
   Future<void> _loadPersistedSettings() async {
@@ -84,6 +131,74 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       _dailyReminderEnabled = persistedReminder ?? _dailyReminderEnabled;
       _compactLayoutEnabled = persistedCompactLayout ?? _compactLayoutEnabled;
     });
+
+    final docRef = _profileDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportReading(
+        path: 'users/${docRef.id}',
+        reason: 'đọc cài đặt hồ sơ',
+      );
+      final snap = await docRef.get();
+      final data = snap.data();
+      if (data == null) {
+        await _persistSettingsToFirebase();
+        return;
+      }
+
+      final remoteName = data['display_name']?.toString().trim();
+      final remoteAiHints = data['settings_ai_hints_enabled'];
+      final remoteAutoPlay = data['settings_auto_play_enabled'];
+      final remoteNarrator = data['settings_ai_chat_narrator_enabled'];
+      final remoteReminder = data['settings_daily_reminder'];
+      final remoteCompact = data['settings_compact_layout'];
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        if (remoteName != null && remoteName.isNotEmpty) {
+          _name = remoteName;
+        }
+        if (remoteAiHints is bool) {
+          _aiHintsEnabled = remoteAiHints;
+        }
+        if (remoteAutoPlay is bool) {
+          _autoPlayPronunciation = remoteAutoPlay;
+        }
+        if (remoteNarrator is bool) {
+          _aiChatNarratorEnabled = remoteNarrator;
+        }
+        if (remoteReminder is bool) {
+          _dailyReminderEnabled = remoteReminder;
+        }
+        if (remoteCompact is bool) {
+          _compactLayoutEnabled = remoteCompact;
+        }
+      });
+
+      await prefs.setString(_nameKey, _name);
+      await prefs.setBool(_aiHintsKey, _aiHintsEnabled);
+      await prefs.setBool(_autoPlayKey, _autoPlayPronunciation);
+      await prefs.setBool(_aiChatNarratorKey, _aiChatNarratorEnabled);
+      await prefs.setBool(_dailyReminderKey, _dailyReminderEnabled);
+      await prefs.setBool(_compactLayoutKey, _compactLayoutEnabled);
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.id}',
+        message: 'Đã đọc cài đặt hồ sơ từ Firestore',
+      );
+    } catch (error) {
+      // Ignore cloud read failures and keep local settings.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.id}',
+        operation: 'read profile settings',
+        error: error,
+      );
+    }
   }
 
   Future<void> _persistSettings() async {
@@ -100,6 +215,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     } else {
       await prefs.setString(_avatarKey, base64Encode(_avatarBytes!));
     }
+
+    await _persistSettingsToFirebase();
   }
 
   Future<void> _closeWithResult() async {

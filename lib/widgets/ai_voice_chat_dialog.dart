@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../services/firestore_sync_status.dart';
 import '../services/voice_chat_service.dart';
 
 enum _VoiceMode { idle, listening, thinking, speaking }
@@ -102,6 +105,42 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
     setState(() {
       _narratorEnabled = enabled ?? _narratorEnabled;
     });
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportReading(
+        path: 'users/${user.uid}',
+        reason: 'đọc settings_ai_chat_narrator_enabled',
+      );
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final remoteEnabled = doc.data()?['settings_ai_chat_narrator_enabled'];
+      if (remoteEnabled is bool) {
+        if (mounted) {
+          setState(() {
+            _narratorEnabled = remoteEnabled;
+          });
+        }
+        await prefs.setBool(_aiChatNarratorKey, remoteEnabled);
+      }
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${user.uid}',
+        message: 'Đã đồng bộ narrator setting từ Firestore',
+      );
+    } catch (error) {
+      // Keep local fallback if cloud access fails.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${user.uid}',
+        operation: 'read narrator setting',
+        error: error,
+      );
+    }
   }
 
   Future<void> _initSpeech() async {

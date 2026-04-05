@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
@@ -8,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'flashcard_category_screen.dart';
 import '../models/saved_card.dart';
 import '../services/saved_cards_repository.dart';
+import '../services/firestore_sync_status.dart';
 import '../services/topic_classifier.dart';
 
 class DeckListScreen extends StatefulWidget {
@@ -23,6 +26,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
   final SavedCardsRepository _repository = SavedCardsRepository.instance;
   final SpeechToText _speech = SpeechToText();
   final TextEditingController _searchController = TextEditingController();
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
 
   Map<String, int> _hintsCountCache = {};
 
@@ -160,6 +164,59 @@ class _DeckListScreenState extends State<DeckListScreen> {
     _loadHintCounts();
   }
 
+  DocumentReference<Map<String, dynamic>>? _learningStateDoc() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('learning_state')
+        .doc('state');
+  }
+
+  Map<String, dynamic> _serializeRecentAccessForFirebase() {
+    final map = <String, dynamic>{};
+    for (final entry in _recentAccessByTopic.entries) {
+      map[entry.key] = {
+        'lastAccessAt': entry.value.lastAccessAt,
+        'practiced': entry.value.practiced,
+        'practiceDurationSeconds': entry.value.practiceDurationSeconds,
+      };
+    }
+    return map;
+  }
+
+  Future<void> _persistRecentAccessToFirebase() async {
+    final docRef = _learningStateDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        reason: 'ghi recent_access_by_topic',
+      );
+      await docRef.set({
+        'recent_access_by_topic': _serializeRecentAccessForFirebase(),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        message: 'Đã ghi recent access lên Firestore',
+      );
+    } catch (error) {
+      // Keep app usable even when cloud sync fails.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        operation: 'write recent_access_by_topic',
+        error: error,
+      );
+    }
+  }
+
   Future<void> _loadHintCounts() async {
     try {
       final raw = await rootBundle.loadString(
@@ -229,8 +286,135 @@ class _DeckListScreenState extends State<DeckListScreen> {
           ..clear()
           ..addAll(loaded);
       });
-    } catch (_) {
+
+      final docRef = _learningStateDoc();
+      if (docRef == null) {
+        return;
+      }
+
+      FirestoreSyncStatus.instance.reportReading(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        reason: 'đọc recent_access_by_topic',
+      );
+      final snap = await docRef.get();
+      final remoteRaw = snap.data()?['recent_access_by_topic'];
+
+      if (remoteRaw is Map) {
+        final remoteLoaded =
+            <
+              String,
+              ({int lastAccessAt, bool practiced, int practiceDurationSeconds})
+            >{};
+        for (final entry in remoteRaw.entries) {
+          final topic = entry.key.toString().trim();
+          if (topic.isEmpty || entry.value is! Map) {
+            continue;
+          }
+          final valueMap = Map<String, dynamic>.from(
+            (entry.value as Map).cast<String, dynamic>(),
+          );
+          final rawTime = valueMap['lastAccessAt'];
+          final rawPracticed = valueMap['practiced'];
+          final rawDuration = valueMap['practiceDurationSeconds'];
+
+          final timestamp = rawTime is int
+              ? rawTime
+              : (rawTime is num ? rawTime.toInt() : null);
+          if (timestamp == null) {
+            continue;
+          }
+
+          remoteLoaded[topic] = (
+            lastAccessAt: timestamp,
+            practiced: rawPracticed == true,
+            practiceDurationSeconds: rawDuration is int
+                ? rawDuration
+                : (rawDuration is num ? rawDuration.toInt() : 0),
+          );
+        }
+
+        if (remoteLoaded.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _recentAccessByTopic
+                ..clear()
+                ..addAll(remoteLoaded);
+            });
+          }
+          await _persistRecentAccessHistory();
+          return;
+        }
+      }
+
+      if (remoteRaw == null) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          final legacySnap = await _firestore
+              .collection('user_learning_state')
+              .doc(currentUser.uid)
+              .get();
+          final legacyRaw = legacySnap.data()?['recent_access_by_topic'];
+          if (legacyRaw is Map) {
+            final remoteLoaded = <
+              String,
+              ({int lastAccessAt, bool practiced, int practiceDurationSeconds})
+            >{};
+            for (final entry in legacyRaw.entries) {
+              final topic = entry.key.toString().trim();
+              if (topic.isEmpty || entry.value is! Map) {
+                continue;
+              }
+              final valueMap = Map<String, dynamic>.from(
+                (entry.value as Map).cast<String, dynamic>(),
+              );
+              final rawTime = valueMap['lastAccessAt'];
+              final rawPracticed = valueMap['practiced'];
+              final rawDuration = valueMap['practiceDurationSeconds'];
+              final timestamp = rawTime is int
+                  ? rawTime
+                  : (rawTime is num ? rawTime.toInt() : null);
+              if (timestamp == null) {
+                continue;
+              }
+              remoteLoaded[topic] = (
+                lastAccessAt: timestamp,
+                practiced: rawPracticed == true,
+                practiceDurationSeconds: rawDuration is int
+                    ? rawDuration
+                    : (rawDuration is num ? rawDuration.toInt() : 0),
+              );
+            }
+
+            if (remoteLoaded.isNotEmpty) {
+              if (mounted) {
+                setState(() {
+                  _recentAccessByTopic
+                    ..clear()
+                    ..addAll(remoteLoaded);
+                });
+              }
+              await _persistRecentAccessHistory();
+              return;
+            }
+          }
+        }
+      }
+
+      if (_recentAccessByTopic.isNotEmpty) {
+        await _persistRecentAccessToFirebase();
+      }
+
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        message: 'Đã đọc recent access từ Firestore',
+      );
+    } catch (error) {
       // Ignore persistence errors and keep recent tab functional in-memory.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/{uid}/learning_state/state',
+        operation: 'read recent_access_by_topic',
+        error: error,
+      );
     }
   }
 
@@ -244,6 +428,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
           )
           .toList();
       await prefs.setStringList(_recentAccessHistoryKey, entries);
+      await _persistRecentAccessToFirebase();
     } catch (_) {
       // Ignore persistence errors so opening a deck is never blocked.
     }

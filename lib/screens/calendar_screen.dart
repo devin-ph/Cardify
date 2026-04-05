@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/firestore_sync_status.dart';
 import '../services/saved_cards_repository.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -32,6 +35,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   ];
 
   final SavedCardsRepository _repository = SavedCardsRepository.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateUtils.dateOnly(DateTime.now());
   DateTime? _appStartedAt;
@@ -41,6 +45,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Map<String, List<String>> _scheduledDecksByDay = <String, List<String>>{};
   Map<String, String> _scheduledTimeByDay = <String, String>{};
   Map<String, int> _scheduledStyleByDay = <String, int>{};
+  int _lastSyncedStreak = -1;
 
   @override
   void initState() {
@@ -59,6 +64,115 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void dispose() {
     _repository.cardsNotifier.removeListener(_onCardsChanged);
     super.dispose();
+  }
+
+  DocumentReference<Map<String, dynamic>>? _learningStateDoc() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('learning_state')
+        .doc('state');
+  }
+
+  DocumentReference<Map<String, dynamic>>? _profileDoc() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return _firestore.collection('users').doc(user.uid);
+  }
+
+  Future<void> _persistStreakToProfile() async {
+    final docRef = _profileDoc();
+    if (docRef == null || _currentStreak == _lastSyncedStreak) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/${docRef.id}',
+        reason: 'ghi streak từ cập nhật lịch học',
+      );
+      await docRef.set({
+        'streak': _currentStreak,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      _lastSyncedStreak = _currentStreak;
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.id}',
+        message: 'Đã cập nhật streak vào hồ sơ Firestore',
+      );
+    } catch (error) {
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.id}',
+        operation: 'write streak from calendar',
+        error: error,
+      );
+    }
+  }
+
+  Future<void> _persistAppStartToFirebase(DateTime value) async {
+    final docRef = _learningStateDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        reason: 'ghi app_started_at',
+      );
+      await docRef.set({
+        'app_started_at': value.toIso8601String(),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        message: 'Đã ghi app_started_at lên Firestore',
+      );
+    } catch (error) {
+      // Ignore cloud sync failures to keep UX responsive.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        operation: 'write app_started_at',
+        error: error,
+      );
+    }
+  }
+
+  Future<void> _persistSchedulesToFirebase() async {
+    final docRef = _learningStateDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        reason: 'ghi lịch học',
+      );
+      await docRef.set({
+        'scheduled_decks_by_day': _scheduledDecksByDay,
+        'scheduled_time_by_day': _scheduledTimeByDay,
+        'scheduled_style_by_day': _scheduledStyleByDay,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        message: 'Đã ghi lịch học lên Firestore',
+      );
+    } catch (error) {
+      // Ignore cloud sync failures to keep UX responsive.
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        operation: 'write schedules',
+        error: error,
+      );
+    }
   }
 
   String _dateKey(DateTime date) {
@@ -146,6 +260,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
       if (raw == null || raw.isEmpty) {
         await prefs.setString(_appStartedAtKey, parsed.toIso8601String());
+        await _persistAppStartToFirebase(parsed);
       }
 
       if (!mounted) {
@@ -158,7 +273,36 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _appStartedAt = parsed;
         _refreshCalendarStats();
       });
-    } catch (_) {
+
+      final docRef = _learningStateDoc();
+      if (docRef == null) {
+        return;
+      }
+
+      FirestoreSyncStatus.instance.reportReading(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        reason: 'đọc app_started_at',
+      );
+      final snap = await docRef.get();
+      final remoteRaw = snap.data()?['app_started_at'];
+      if (remoteRaw is String && remoteRaw.trim().isNotEmpty) {
+        final remoteDate = DateUtils.dateOnly(DateTime.parse(remoteRaw));
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _appStartedAt = remoteDate;
+          _refreshCalendarStats();
+        });
+        await prefs.setString(_appStartedAtKey, remoteDate.toIso8601String());
+        FirestoreSyncStatus.instance.reportSuccess(
+          path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+          message: 'Đã đọc app_started_at từ Firestore',
+        );
+      } else {
+        await _persistAppStartToFirebase(parsed);
+      }
+    } catch (error) {
       final fallback = DateUtils.dateOnly(DateTime.now());
       if (!mounted) {
         return;
@@ -169,6 +313,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_appStartedAtKey, fallback.toIso8601String());
+      await _persistAppStartToFirebase(fallback);
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/{uid}/learning_state/state',
+        operation: 'read app_started_at',
+        error: error,
+      );
     }
   }
 
@@ -191,11 +341,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (!mounted) {
       _availableDecks = topics;
+      _refreshCalendarStats();
       return;
     }
 
     setState(() {
       _availableDecks = topics;
+      _refreshCalendarStats();
     });
   }
 
@@ -203,31 +355,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_scheduleStorageKey);
-      if (raw == null || raw.isEmpty) {
-        _refreshCalendarStats();
-        return;
-      }
-
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) {
-        _refreshCalendarStats();
-        return;
-      }
-
       final parsed = <String, List<String>>{};
-      for (final entry in decoded.entries) {
-        final key = entry.key.toString();
-        final value = entry.value;
-        if (value is List) {
-          final decks =
-              value
-                  .map((item) => item.toString().trim())
-                  .where((item) => item.isNotEmpty)
-                  .toSet()
-                  .toList()
-                ..sort();
-          if (decks.isNotEmpty) {
-            parsed[key] = decks;
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          for (final entry in decoded.entries) {
+            final key = entry.key.toString();
+            final value = entry.value;
+            if (value is List) {
+              final decks =
+                  value
+                      .map((item) => item.toString().trim())
+                      .where((item) => item.isNotEmpty)
+                      .toSet()
+                      .toList()
+                    ..sort();
+              if (decks.isNotEmpty) {
+                parsed[key] = decks;
+              }
+            }
           }
         }
       }
@@ -276,11 +422,182 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _scheduledStyleByDay = parsedStyles;
         _refreshCalendarStats();
       });
-    } catch (_) {
+
+      final docRef = _learningStateDoc();
+      if (docRef == null) {
+        return;
+      }
+
+      FirestoreSyncStatus.instance.reportReading(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        reason: 'đọc lịch học',
+      );
+      final snap = await docRef.get();
+      final data = snap.data();
+      if (data == null) {
+        final legacySnap = await _firestore.collection('user_learning_state').doc(FirebaseAuth.instance.currentUser!.uid).get();
+        final legacyData = legacySnap.data();
+        if (legacyData != null) {
+          final legacyDecksRaw = legacyData['scheduled_decks_by_day'];
+          final legacyTimesRaw = legacyData['scheduled_time_by_day'];
+          final legacyStylesRaw = legacyData['scheduled_style_by_day'];
+          final migratedDecks = <String, List<String>>{};
+          if (legacyDecksRaw is Map) {
+            for (final entry in legacyDecksRaw.entries) {
+              final key = entry.key.toString();
+              final value = entry.value;
+              if (value is List) {
+                final decks = value
+                    .map((item) => item.toString().trim())
+                    .where((item) => item.isNotEmpty)
+                    .toSet()
+                    .toList()
+                  ..sort();
+                if (decks.isNotEmpty) {
+                  migratedDecks[key] = decks;
+                }
+              }
+            }
+          }
+          final migratedTimes = <String, String>{};
+          if (legacyTimesRaw is Map) {
+            for (final entry in legacyTimesRaw.entries) {
+              final key = entry.key.toString();
+              final value = entry.value?.toString();
+              if (_timeFromStorage(value) != null) {
+                migratedTimes[key] = value!;
+              }
+            }
+          }
+          final migratedStyles = <String, int>{};
+          if (legacyStylesRaw is Map) {
+            for (final entry in legacyStylesRaw.entries) {
+              final key = entry.key.toString();
+              final rawValue = entry.value;
+              final parsedValue = rawValue is int
+                  ? rawValue
+                  : (rawValue is num ? rawValue.toInt() : null);
+              if (parsedValue != null) {
+                migratedStyles[key] = _normalizedGradientIndex(parsedValue);
+              }
+            }
+          }
+          if (migratedDecks.isNotEmpty || migratedTimes.isNotEmpty || migratedStyles.isNotEmpty) {
+            _scheduledDecksByDay = migratedDecks;
+            _scheduledTimeByDay = migratedTimes;
+            _scheduledStyleByDay = migratedStyles;
+            _refreshCalendarStats();
+            await _persistSchedulesToFirebase();
+          }
+          FirestoreSyncStatus.instance.reportSuccess(
+            path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+            message: 'Đã đọc/migrate lịch học từ Firestore',
+          );
+          return;
+        }
+
+        if (_scheduledDecksByDay.isNotEmpty ||
+            _scheduledTimeByDay.isNotEmpty ||
+            _scheduledStyleByDay.isNotEmpty) {
+          await _persistSchedulesToFirebase();
+        }
+        FirestoreSyncStatus.instance.reportSuccess(
+          path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+          message: 'Đã xử lý lịch học khi chưa có dữ liệu cloud',
+        );
+        return;
+      }
+
+      final remoteDecksRaw = data['scheduled_decks_by_day'];
+      final remoteTimesRaw = data['scheduled_time_by_day'];
+      final remoteStylesRaw = data['scheduled_style_by_day'];
+
+      final remoteDecks = <String, List<String>>{};
+      if (remoteDecksRaw is Map) {
+        for (final entry in remoteDecksRaw.entries) {
+          final key = entry.key.toString();
+          final value = entry.value;
+          if (value is List) {
+            final decks = value
+                .map((item) => item.toString().trim())
+                .where((item) => item.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
+            if (decks.isNotEmpty) {
+              remoteDecks[key] = decks;
+            }
+          }
+        }
+      }
+
+      final remoteTimes = <String, String>{};
+      if (remoteTimesRaw is Map) {
+        for (final entry in remoteTimesRaw.entries) {
+          final key = entry.key.toString();
+          final value = entry.value?.toString();
+          if (_timeFromStorage(value) != null) {
+            remoteTimes[key] = value!;
+          }
+        }
+      }
+
+      final remoteStyles = <String, int>{};
+      if (remoteStylesRaw is Map) {
+        for (final entry in remoteStylesRaw.entries) {
+          final key = entry.key.toString();
+          final rawValue = entry.value;
+          final parsedValue = rawValue is int
+              ? rawValue
+              : (rawValue is num ? rawValue.toInt() : null);
+          if (parsedValue != null) {
+            remoteStyles[key] = _normalizedGradientIndex(parsedValue);
+          }
+        }
+      }
+
+      if (remoteDecks.isNotEmpty || remoteTimes.isNotEmpty || remoteStyles.isNotEmpty) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _scheduledDecksByDay = remoteDecks;
+          _scheduledTimeByDay = remoteTimes;
+          _scheduledStyleByDay = remoteStyles;
+          _refreshCalendarStats();
+        });
+
+        await prefs.setString(
+          _scheduleStorageKey,
+          jsonEncode(_scheduledDecksByDay),
+        );
+        await prefs.setString(
+          _scheduleTimeStorageKey,
+          jsonEncode(_scheduledTimeByDay),
+        );
+        await prefs.setString(
+          _scheduleStyleStorageKey,
+          jsonEncode(_scheduledStyleByDay),
+        );
+      } else if (_scheduledDecksByDay.isNotEmpty ||
+          _scheduledTimeByDay.isNotEmpty ||
+          _scheduledStyleByDay.isNotEmpty) {
+        await _persistSchedulesToFirebase();
+      }
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.parent.parent?.id}/learning_state/state',
+        message: 'Đã đọc lịch học từ Firestore',
+      );
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(_refreshCalendarStats);
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/{uid}/learning_state/state',
+        operation: 'read schedules',
+        error: error,
+      );
     }
   }
 
@@ -298,6 +615,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _scheduleStyleStorageKey,
       jsonEncode(_scheduledStyleByDay),
     );
+    await _persistSchedulesToFirebase();
   }
 
   bool _hasScheduleOnDate(DateTime date) {
@@ -332,6 +650,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         )
         .toList();
     _currentStreak = _calculateCurrentStreak();
+      _persistStreakToProfile();
   }
 
   int _calculateCurrentStreak() {
