@@ -24,6 +24,7 @@ import 'flashcard_category_screen.dart';
 import 'home_screen.dart';
 import 'image_capture_screen.dart';
 import 'main_loading_screen.dart';
+import 'profile_screen.dart';
 import 'profile_settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -65,10 +66,12 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLaunchingDueDeck = false;
   bool _isFriendsPanelOpen = false;
   bool _isSearchingFriend = false;
+  bool _isAddingFriend = false;
   bool _isEnsuringSocialId = false;
   String? _friendSearchError;
   final TextEditingController _friendIdController = TextEditingController();
   List<Map<String, dynamic>> _friends = <Map<String, dynamic>>[];
+  Map<String, dynamic>? _searchedFriend;
 
   @override
   void initState() {
@@ -327,7 +330,7 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  Future<void> _searchAndAddFriendById() async {
+  Future<void> _searchFriendById() async {
     final myDocRef = _profileDocRef();
     final myUser = firebase_auth.FirebaseAuth.instance.currentUser;
     if (myDocRef == null || myUser == null) {
@@ -344,6 +347,7 @@ class _MainScreenState extends State<MainScreen> {
 
     setState(() {
       _friendSearchError = null;
+      _searchedFriend = null;
     });
 
     if (queryId == _socialId.trim().toUpperCase()) {
@@ -367,6 +371,7 @@ class _MainScreenState extends State<MainScreen> {
         if (mounted) {
           setState(() {
             _friendSearchError = 'Không tìm thấy ID.';
+            _searchedFriend = null;
           });
         }
         return;
@@ -377,6 +382,11 @@ class _MainScreenState extends State<MainScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Không thể tự kết bạn với chính mình.')),
         );
+        if (mounted) {
+          setState(() {
+            _searchedFriend = null;
+          });
+        }
         return;
       }
 
@@ -384,21 +394,91 @@ class _MainScreenState extends State<MainScreen> {
         (friend) => friend['uid']?.toString().trim() == friendDoc.id,
       );
       if (existing) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Người này đã có trong danh sách bạn bè.')),
-        );
+        if (mounted) {
+          final data = friendDoc.data();
+          setState(() {
+            _friendSearchError = 'Người này đã có trong danh sách bạn bè.';
+            _searchedFriend = <String, dynamic>{
+              'uid': friendDoc.id,
+              'social_id': data['social_id']?.toString().trim() ?? queryId,
+              'display_name': data['display_name']?.toString().trim() ?? '',
+              'email': data['email']?.toString().trim() ?? '',
+              'avatar_base64': data['avatar_base64']?.toString().trim() ?? '',
+            };
+          });
+        }
         return;
       }
 
       final data = friendDoc.data();
-      final updatedFriends = <Map<String, dynamic>>[
-        ..._friends,
-        <String, dynamic>{
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _searchedFriend = <String, dynamic>{
           'uid': friendDoc.id,
           'social_id': data['social_id']?.toString().trim() ?? queryId,
           'display_name': data['display_name']?.toString().trim() ?? '',
           'email': data['email']?.toString().trim() ?? '',
           'avatar_base64': data['avatar_base64']?.toString().trim() ?? '',
+        };
+        _friendSearchError = null;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _friendSearchError = 'Không thể tìm bạn. Vui lòng thử lại.';
+        _searchedFriend = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearchingFriend = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _addSearchedFriend() async {
+    final myDocRef = _profileDocRef();
+    final candidate = _searchedFriend;
+    if (myDocRef == null || candidate == null) {
+      return;
+    }
+
+    final candidateUid = candidate['uid']?.toString().trim() ?? '';
+    if (candidateUid.isEmpty) {
+      return;
+    }
+
+    final existing = _friends.any(
+      (friend) => friend['uid']?.toString().trim() == candidateUid,
+    );
+    if (existing) {
+      if (mounted) {
+        setState(() {
+          _friendSearchError = 'Người này đã có trong danh sách bạn bè.';
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _isAddingFriend = true;
+      _friendSearchError = null;
+    });
+
+    try {
+      final updatedFriends = <Map<String, dynamic>>[
+        ..._friends,
+        <String, dynamic>{
+          'uid': candidateUid,
+          'social_id': candidate['social_id']?.toString().trim() ?? '',
+          'display_name': candidate['display_name']?.toString().trim() ?? '',
+          'email': candidate['email']?.toString().trim() ?? '',
+          'avatar_base64': candidate['avatar_base64']?.toString().trim() ?? '',
         },
       ];
 
@@ -410,10 +490,11 @@ class _MainScreenState extends State<MainScreen> {
       if (!mounted) {
         return;
       }
+
       setState(() {
         _friends = _parseFriends(updatedFriends);
+        _searchedFriend = null;
         _friendIdController.clear();
-        _friendSearchError = null;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -423,13 +504,13 @@ class _MainScreenState extends State<MainScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể thêm bạn bè. Vui lòng thử lại.')),
-      );
+      setState(() {
+        _friendSearchError = 'Không thể thêm bạn bè. Vui lòng thử lại.';
+      });
     } finally {
       if (mounted) {
         setState(() {
-          _isSearchingFriend = false;
+          _isAddingFriend = false;
         });
       }
     }
@@ -540,6 +621,11 @@ class _MainScreenState extends State<MainScreen> {
                                 _friendSearchError = null;
                               });
                             }
+                            if (_searchedFriend != null) {
+                              setState(() {
+                                _searchedFriend = null;
+                              });
+                            }
                           },
                           decoration: InputDecoration(
                             hintText: 'Nhập ID bạn bè',
@@ -558,7 +644,7 @@ class _MainScreenState extends State<MainScreen> {
                       FilledButton.icon(
                         onPressed: _isSearchingFriend
                             ? null
-                            : _searchAndAddFriendById,
+                            : _searchFriendById,
                         icon: _isSearchingFriend
                             ? const SizedBox(
                                 width: 14,
@@ -573,6 +659,113 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   ),
+                  if (_searchedFriend != null) ...[
+                    const SizedBox(height: 10),
+                    Builder(
+                      builder: (context) {
+                        final friend = _searchedFriend!;
+                        final displayName =
+                            friend['display_name']?.toString().trim() ?? '';
+                        final socialId =
+                            friend['social_id']?.toString().trim() ?? '';
+                        final avatarBase64 =
+                            friend['avatar_base64']?.toString().trim() ?? '';
+                        Uint8List? avatarBytes;
+                        if (avatarBase64.isNotEmpty) {
+                          try {
+                            avatarBytes = base64Decode(avatarBase64);
+                          } catch (_) {
+                            avatarBytes = null;
+                          }
+                        }
+                        final alreadyFriend = _friends.any(
+                          (item) =>
+                              item['uid']?.toString().trim() ==
+                              friend['uid']?.toString().trim(),
+                        );
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF2F6FD),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: const Color(0xFFE9EEFF),
+                                backgroundImage: avatarBytes != null
+                                    ? MemoryImage(avatarBytes)
+                                    : null,
+                                child: avatarBytes == null
+                                    ? Text(
+                                        displayName.isNotEmpty
+                                            ? displayName[0].toUpperCase()
+                                            : 'U',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF344B72),
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayName.isNotEmpty
+                                          ? displayName
+                                          : socialId,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1F2740),
+                                      ),
+                                    ),
+                                    Text(
+                                      'ID: $socialId',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF556987),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton.filled(
+                                tooltip: alreadyFriend
+                                    ? 'Đã là bạn bè'
+                                    : 'Thêm bạn',
+                                onPressed: alreadyFriend || _isAddingFriend
+                                    ? null
+                                    : _addSearchedFriend,
+                                icon: _isAddingFriend
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.add_rounded),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   const Text(
                     'Danh sách bạn bè',
@@ -1011,6 +1204,23 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _onProfileTap() async {
+    await _showProfileQuickMenu();
+  }
+
+  Future<void> _openProfileScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(
+          name: _userName,
+          email: _userEmail,
+          socialId: _socialId,
+          avatarBytes: _userAvatarBytes,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSettingsScreen() async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
         builder: (context) =>
@@ -1031,6 +1241,53 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {
         _userName = updatedName;
       });
+    }
+  }
+
+  Future<void> _showProfileQuickMenu() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: false,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.badge_outlined),
+                  title: const Text('Hồ sơ'),
+                  onTap: () => Navigator.of(sheetContext).pop('profile'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.settings_outlined),
+                  title: const Text('Cài đặt'),
+                  onTap: () => Navigator.of(sheetContext).pop('settings'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null) {
+      return;
+    }
+
+    if (selected == 'profile') {
+      await _openProfileScreen();
+      return;
+    }
+
+    if (selected == 'settings') {
+      await _openSettingsScreen();
     }
   }
 
@@ -1252,7 +1509,7 @@ class _MainScreenState extends State<MainScreen> {
             gradient: LinearGradient(
               colors: [
                 Color.fromARGB(255, 230, 220, 249),
-                Color.fromARGB(255, 215, 248, 246),
+                Color.fromARGB(255, 227, 250, 249),
                 Color.fromARGB(255, 212, 226, 252),
               ],
               stops: [0.0, 0.5, 1.0],

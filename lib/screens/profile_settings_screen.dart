@@ -559,7 +559,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Hồ sơ & Cài đặt'),
+          title: const Text('Cài đặt'),
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
