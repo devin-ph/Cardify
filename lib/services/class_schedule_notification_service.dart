@@ -110,22 +110,22 @@ class ClassScheduleNotificationService {
 
   String _buildTitle(List<String> decks) {
     if (decks.isEmpty) {
-      return 'Gio hoc sap bat dau';
+      return 'Giờ học sắp bắt đầu';
     }
     return decks.length == 1
-        ? 'Sap den gio hoc ${decks.first}'
-        : 'Sap den gio hoc';
+        ? 'Sắp đến giờ học ${decks.first}'
+        : 'Sắp đến giờ học';
   }
 
   String _buildBody(List<String> decks, String timeLabel) {
     if (decks.isEmpty) {
-      return 'Buoi hoc bat dau luc $timeLabel. Moi ban mo ung dung de on tap.';
+      return 'Buổi học bắt đầu lúc $timeLabel. Mời bạn mở ứng dụng để ôn tập .';
     }
 
     final topicText = decks.length == 1
-        ? 'Chu de ${decks.first}'
-        : 'Cac chu de ${decks.join(', ')}';
-    return '$topicText bat dau luc $timeLabel. Moi ban mo ung dung de on tap.';
+        ? 'Chủ đề ${decks.first}'
+        : 'Các chủ đề ${decks.join(', ')}';
+    return '$topicText bắt đầu lúc $timeLabel. Mời bạn mở ứng dụng để ôn tập.';
   }
 
   NotificationDetails _notificationDetails() {

@@ -24,7 +24,7 @@ class VoiceChatReply {
 
   factory VoiceChatReply.fromJson(Map<String, dynamic> json) {
     return VoiceChatReply(
-      topic: json['topic']?.toString() ?? 'General',
+      topic: json['topic']?.toString() ?? 'Learning',
       intentType: json['intent_type']?.toString() ?? 'other',
       englishTerm: json['english_term']?.toString() ?? '',
       phonetic: json['phonetic']?.toString() ?? '',
@@ -65,6 +65,8 @@ class VoiceChatService {
   Future<VoiceChatReply> askAI({
     required String message,
     List<Map<String, String>> history = const [],
+    List<String> learnedWords = const [],
+    List<String> unscannedWords = const [],
   }) async {
     final endpoint = _resolveChatEndpoint();
     final uri = Uri.parse(endpoint);
@@ -72,7 +74,12 @@ class VoiceChatService {
     final response = await _client.post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'message': message, 'history': history}),
+      body: jsonEncode({
+        'message': message,
+        'history': history,
+        'learned_words': learnedWords,
+        'unscanned_words': unscannedWords,
+      }),
     );
 
     final payload = response.body.isNotEmpty
@@ -90,7 +97,7 @@ class VoiceChatService {
       final reply = payload['response']?.toString().trim() ?? '';
       if (reply.isNotEmpty) {
         return VoiceChatReply(
-          topic: 'General',
+          topic: 'Learning',
           intentType: 'other',
           englishTerm: '',
           phonetic: '',

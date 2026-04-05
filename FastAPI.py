@@ -54,6 +54,70 @@ CHAT_REQUIRED_FIELDS = {
     "response": "Câu trả lời thân thiện cho người học",
 }
 
+ALLOWED_TOPICS = [
+    "Electronics",
+    "Furniture",
+    "Animals",
+    "Nature",
+    "Technology",
+    "Learning",
+    "Food",
+    "Vehicles",
+    "Household Items",
+]
+
+TOPIC_SYNONYMS: Dict[str, str] = {
+    "electronics": "Electronics",
+    "electronic": "Electronics",
+    "furniture": "Furniture",
+    "animal": "Animals",
+    "animals": "Animals",
+    "nature": "Nature",
+    "technology": "Technology",
+    "tech": "Technology",
+    "learning": "Learning",
+    "education": "Learning",
+    "food": "Food",
+    "vehicle": "Vehicles",
+    "vehicles": "Vehicles",
+    "transport": "Vehicles",
+    "transportation": "Vehicles",
+    "household": "Household Items",
+    "household items": "Household Items",
+    "home": "Household Items",
+    "home items": "Household Items",
+}
+
+TOPIC_KEYWORDS: Dict[str, List[str]] = {
+    "Electronics": [
+        r"\b(earbuds?|headphones?|airpods?|speaker|tv|monitor|camera|phone|smartphone|tablet|laptop|charger|power bank)\b",
+    ],
+    "Furniture": [
+        r"\b(table|desk|chair|sofa|bed|wardrobe|cabinet|shelf|bookshelf|drawer)\b",
+    ],
+    "Animals": [
+        r"\b(dog|cat|bird|fish|horse|cow|pig|rabbit|lion|tiger|elephant|monkey)\b",
+    ],
+    "Nature": [
+        r"\b(tree|flower|river|mountain|forest|leaf|grass|sun|moon|cloud|rain|ocean|beach)\b",
+    ],
+    "Technology": [
+        r"\b(software|hardware|app|application|code|coding|programming|algorithm|ai|robot|server|database|api)\b",
+    ],
+    "Learning": [
+        r"\b(book|notebook|lesson|class|student|teacher|school|university|study|learn|learning|homework|exam|pen|pencil)\b",
+    ],
+    "Food": [
+        r"\b(food|meal|rice|bread|noodle|noodles|pizza|burger|cake|fruit|vegetable|meat|drink|water|coffee|tea)\b",
+    ],
+    "Vehicles": [
+        r"\b(car|bus|truck|motorbike|motorcycle|bike|bicycle|train|plane|airplane|airport|ship|boat|scooter)\b",
+    ],
+    "Household Items": [
+        r"\b(cup|bottle|plate|spoon|fork|knife|bowl|toothbrush|towel|blanket|pillow|lamp|fan|remote|basket|case)\b",
+    ],
+}
+
 GENERALIZATION_RULES: Dict[str, str] = {
     r"\b(dell|hp|lenovo|acer|asus|macbook)\b": "laptop",
     r"\b(iphone|samsung|oppo|xiaomi|vivo|pixel)\b": "smartphone",
@@ -118,6 +182,7 @@ class ChatRequest(BaseModel):
     message: str
     history: List[ChatMessage] = Field(default_factory=list)
     learned_words: List[str] = Field(default_factory=list)
+    unscanned_words: List[str] = Field(default_factory=list)
 
 
 class ChatResponseData(BaseModel):
@@ -184,6 +249,13 @@ def build_chat_messages(request: ChatRequest) -> List[Dict[str, str]]:
     system_content = CHAT_PROMPT
     if request.learned_words:
         system_content += f"\n\n[THÔNG TIN THÔNG MINH] Danh sách từ vựng người dùng ĐÃ QUÉT/HỌC thành công: {', '.join(request.learned_words)}."
+    if request.unscanned_words:
+        preview = request.unscanned_words[:120]
+        system_content += (
+            "\n\n[THÔNG TIN THÔNG MINH] Danh sách từ vựng người dùng CHƯA QUÉT: "
+            f"{', '.join(preview)}."
+            "\nKhi đố vui, ưu tiên chọn từ trong danh sách CHƯA QUÉT để người dùng có thể đi quét thật ngoài đời."
+        )
 
     messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
 
@@ -229,6 +301,40 @@ def _extract_json(raw_content: str) -> Dict[str, Any]:
     return json.loads(content)
 
 
+def _normalize_topic(raw_topic: str) -> Optional[str]:
+    key = raw_topic.strip().lower()
+    if not key:
+        return None
+    if key in TOPIC_SYNONYMS:
+        return TOPIC_SYNONYMS[key]
+    for topic in ALLOWED_TOPICS:
+        if key == topic.lower():
+            return topic
+    return None
+
+
+def _infer_topic(*texts: str) -> Optional[str]:
+    merged = " ".join((text or "").lower() for text in texts).strip()
+    if not merged:
+        return None
+    for topic in ALLOWED_TOPICS:
+        patterns = TOPIC_KEYWORDS.get(topic, [])
+        for pattern in patterns:
+            if re.search(pattern, merged):
+                return topic
+    return None
+
+
+def _coerce_topic(raw_topic: str, *context_texts: str) -> str:
+    normalized = _normalize_topic(raw_topic)
+    if normalized:
+        return normalized
+    inferred = _infer_topic(*context_texts)
+    if inferred:
+        return inferred
+    return "Learning"
+
+
 
 def validate_analysis(payload: Dict[str, Any]) -> Dict[str, Any]:
     # Nếu AI thiếu trả về khóa, tự động gán rỗng để tránh lỗi 502
@@ -237,6 +343,12 @@ def validate_analysis(payload: Dict[str, Any]) -> Dict[str, Any]:
             payload[field] = ""
 
     payload["word"] = generalize_word(str(payload["word"]))
+    payload["topic"] = _coerce_topic(
+        str(payload.get("topic", "")),
+        str(payload.get("word", "")),
+        str(payload.get("vietnamese_meaning", "")),
+        str(payload.get("example_sentence", "")),
+    )
     return payload
 
 
@@ -258,7 +370,13 @@ def validate_chat_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     payload["vietnamese_meaning"] = str(payload.get("vietnamese_meaning", "")).strip()
     payload["example_sentence"] = str(payload.get("example_sentence", "")).strip()
     payload["response"] = str(payload.get("response", "")).strip()
-    payload["topic"] = str(payload["topic"]).strip() or "General"
+    payload["topic"] = _coerce_topic(
+        str(payload.get("topic", "")),
+        payload["english_term"],
+        payload["vietnamese_meaning"],
+        payload["example_sentence"],
+        payload["response"],
+    )
 
     if not payload["response"]:
         raise HTTPException(status_code=502, detail="Groq thiếu nội dung response")

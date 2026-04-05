@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/analysis_result.dart';
 import '../models/saved_card.dart';
+import 'vocabulary_service.dart';
 
 class SavedCardsRepository {
   SavedCardsRepository._();
@@ -57,7 +58,6 @@ class SavedCardsRepository {
   }
 
   String get _bucketName => _dotenvValue('SUPABASE_BUCKET', 'btl');
-  String get _tableName => _dotenvValue('SUPABASE_TABLE', 'flashcards');
 
   String _dotenvValue(String key, String fallback) {
     try {
@@ -91,7 +91,8 @@ class SavedCardsRepository {
     );
 
     final legacyTopic = TopicClassifier.normalizeTopic(topic);
-    if (legacyTopic != normalizedTopic && _knownWordsByTopic.containsKey(legacyTopic)) {
+    if (legacyTopic != normalizedTopic &&
+        _knownWordsByTopic.containsKey(legacyTopic)) {
       knownWords.addAll(_knownWordsByTopic.remove(legacyTopic)!);
     }
 
@@ -149,7 +150,9 @@ class SavedCardsRepository {
       final knownWords = _knownWordsForTopic(topic);
       if (knownWords.remove(key)) {
         if (knownWords.isEmpty) {
-          _knownWordsByTopic.remove(TopicClassifier.toVietnameseCanonical(topic));
+          _knownWordsByTopic.remove(
+            TopicClassifier.toVietnameseCanonical(topic),
+          );
         }
         _publishCards();
       }
@@ -196,7 +199,11 @@ class SavedCardsRepository {
   int savedCountForTopic(String topic) {
     final normalizedTopic = TopicClassifier.toVietnameseCanonical(topic);
     return _cards
-        .where((card) => TopicClassifier.toVietnameseCanonical(card.topic) == normalizedTopic)
+        .where(
+          (card) =>
+              TopicClassifier.toVietnameseCanonical(card.topic) ==
+              normalizedTopic,
+        )
         .length;
   }
 
@@ -221,15 +228,16 @@ class SavedCardsRepository {
 
     return {
       'id': card.id,
+      'vocabulary_id': card.vocabularyId,
       'topic': card.topic,
       'word': card.word,
       'phonetic': card.phonetic,
       'meaning': card.meaning,
       'example': card.example,
       'word_type': card.wordType,
-      'image_bytes_base64': ?encodedImage,
+      'image_bytes_base64': encodedImage,
       'image_url': card.imageUrl,
-      'saved_at': card.savedAt.toIso8601String(),
+      'created_at': card.savedAt.toIso8601String(),
     };
   }
 
@@ -315,6 +323,9 @@ class SavedCardsRepository {
   }
 
   void _upsertLocalCard(SavedCard card) {
+    if (card.topic.isNotEmpty) {
+      VocabularyService.instance.addCustomHintIfNeeded(card.word, card.topic);
+    }
     final index = _cards.indexWhere((item) => item.id == card.id);
     if (index >= 0) {
       _cards[index] = card;
@@ -325,7 +336,61 @@ class SavedCardsRepository {
     unawaited(_persistLocalState());
   }
 
+  Future<String> _resolveOrCreateVocabularyId({
+    required String word,
+    required String topic,
+    required String hintVi,
+  }) async {
+    final normalizedWord = word.trim();
+    if (normalizedWord.isEmpty) {
+      throw Exception('Không thể tạo bản ghi từ vựng do thiếu từ tiếng Anh');
+    }
+
+    var vocabularyId =
+        await VocabularyService.instance.findVocabularyIdByMeaning(
+          normalizedWord,
+        ) ??
+        '';
+    if (vocabularyId.isNotEmpty) {
+      return vocabularyId;
+    }
+
+    final maskedMeaning = normalizedWord.toLowerCase().replaceAll(
+      RegExp(r'[aeiou]'),
+      '*',
+    );
+    vocabularyId =
+        await VocabularyService.instance.insertVocabularyHint(
+          topic: topic,
+          meaning: normalizedWord,
+          hint: '',
+          maskedMeaning: maskedMeaning,
+          hintVi: hintVi,
+        ) ??
+        '';
+    if (vocabularyId.isNotEmpty) {
+      return vocabularyId;
+    }
+
+    // Fallback: insert may fail due duplicate/race or policy delay, so retry lookup.
+    vocabularyId =
+        await VocabularyService.instance.findVocabularyIdByMeaning(
+          normalizedWord,
+        ) ??
+        '';
+    if (vocabularyId.isNotEmpty) {
+      return vocabularyId;
+    }
+
+    return '';
+  }
+
   Future<String?> findExistingWord(String normalizedWord) async {
+    // Basic local check first
+    if (containsWord(normalizedWord)) {
+      return normalizedWord;
+    }
+
     final client = _clientOrNull;
     if (client == null) {
       return null;
@@ -336,13 +401,17 @@ class SavedCardsRepository {
 
     try {
       final row = await client
-          .from(_tableName)
-          .select('word')
+          .from('saved_cards')
+          .select('id, vocabulary_hints!inner(meaning)')
           .eq('user_id', uid)
-          .ilike('word', normalizedWord)
+          .ilike('vocabulary_hints.meaning', normalizedWord)
           .limit(1)
           .maybeSingle();
-      return row == null ? null : row['word']?.toString();
+
+      if (row != null && row['vocabulary_hints'] != null) {
+        return row['vocabulary_hints']['meaning']?.toString();
+      }
+      return null;
     } catch (_) {
       return null;
     }
@@ -356,46 +425,59 @@ class SavedCardsRepository {
     if (normalized.isEmpty) {
       throw Exception('Không thể lưu thẻ thiếu từ vựng');
     }
-    final existingWord = await findExistingWord(normalized);
-    if (existingWord != null) {
+
+    // Check if card already exists locally
+    if (containsWord(normalized)) {
       return null;
     }
 
     final client = _clientOrNull;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    String vocabularyId = '';
     final timestamp = DateTime.now();
     String? imageUrl;
 
-    if (client != null) {
+    if (client != null && uid != null) {
       try {
+        vocabularyId = await _resolveOrCreateVocabularyId(
+          word: normalized,
+          topic: result.topic,
+          hintVi: result.vietnameseMeaning,
+        );
+
+        // Step 3: Upload image if present
         if (imageBytes != null && imageBytes.isNotEmpty) {
-          imageUrl = await _uploadImage(client, imageBytes, normalized);
+          try {
+            imageUrl = await _uploadImage(client, imageBytes, normalized);
+          } catch (_) {
+            imageUrl = null;
+          }
         }
 
-        await client.from(_tableName).upsert({
-          'user_id': FirebaseAuth.instance.currentUser?.uid,
-          'word': result.word,
-          'topic': result.topic,
-          'phonetic': result.phonetic,
-          'meaning': result.vietnameseMeaning,
-          'word_type': result.wordType,
-          'example': result.exampleSentence,
-          'image_url': imageUrl,
-          'saved_at': timestamp.toIso8601String(),
-        });
+        // Step 4: Insert to saved_cards only when vocabulary_id is available.
+        if (vocabularyId.isNotEmpty) {
+          await client.from('saved_cards').insert({
+            'user_id': uid,
+            'vocabulary_id': vocabularyId,
+            'topic': result.topic,
+            'image_url': imageUrl,
+            'created_at': timestamp.toIso8601String(),
+          });
+        } else {
+          debugPrint(
+            'Skip remote saveResult: cannot create/resolve vocabulary_id for "$normalized".',
+          );
+        }
       } on StorageException catch (error) {
         throw Exception('Lỗi tải ảnh lên Supabase: ${error.message}');
       } on PostgrestException catch (error) {
-        if (error.message.toLowerCase().contains('user_id')) {
-          throw Exception(
-            'Lỗi: Bảng flashcards trong Supabase chưa có cột "user_id". Vui lòng mở Supabase và thêm cột "user_id" kiểu "text".',
-          );
-        }
-        throw Exception('Lỗi lưu dữ liệu Supabase: ${error.message}');
+        throw Exception('Lỗi lưu thẻ lên Supabase: ${error.message}');
       }
     }
 
     final card = SavedCard.fromAnalysisResult(
       result,
+      vocabularyId,
       imageBytes,
       remoteUrl: imageUrl,
       timestamp: timestamp,
@@ -421,27 +503,64 @@ class SavedCardsRepository {
       throw Exception('Vui lòng nhập nghĩa tiếng Việt');
     }
 
-    final existingWord = await findExistingWord(normalized);
-    if (existingWord != null) {
+    if (containsWord(normalized)) {
       throw Exception('Từ này đã có trong danh sách');
     }
 
     final client = _clientOrNull;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    String vocabularyId = '';
     String? imageUrl;
 
-    if (client != null && imageBytes != null && imageBytes.isNotEmpty) {
+    if (client != null && uid != null) {
       try {
-        imageUrl = await _uploadImage(client, imageBytes, normalized);
-      } catch (_) {
-        imageUrl = null;
+        vocabularyId = await _resolveOrCreateVocabularyId(
+          word: normalized,
+          topic: topic,
+          hintVi: meaning,
+        );
+
+        // Step 3: Upload image if present
+        if (imageBytes != null && imageBytes.isNotEmpty) {
+          try {
+            imageUrl = await _uploadImage(client, imageBytes, normalized);
+          } catch (_) {
+            imageUrl = null;
+          }
+        }
+
+        // Step 4: Insert to saved_cards only when vocabulary_id is available.
+        if (vocabularyId.isNotEmpty) {
+          await client.from('saved_cards').insert({
+            'user_id': uid,
+            'vocabulary_id': vocabularyId,
+            'topic': topic,
+            'image_url': imageUrl,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } else {
+          debugPrint(
+            'Skip remote addManualCard: cannot create/resolve vocabulary_id for "$normalized".',
+          );
+        }
+      } on PostgrestException catch (error) {
+        if (error.message.toLowerCase().contains('user_id')) {
+          throw Exception(
+            'Lỗi: Bảng saved_cards trong Supabase chưa được cấu hình đúng.',
+          );
+        }
+        throw Exception('Lỗi lưu từ mới lên Supabase: ${error.message}');
       }
     }
 
+    final topicCanonical = TopicClassifier.toVietnameseCanonical(
+      topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
+    );
+
     final card = SavedCard(
       id: normalized,
-      topic: TopicClassifier.toVietnameseCanonical(
-        topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
-      ),
+      vocabularyId: vocabularyId,
+      topic: topicCanonical,
       word: word.trim(),
       phonetic: phonetic.trim(),
       meaning: meaning.trim(),
@@ -451,29 +570,6 @@ class SavedCardsRepository {
       imageUrl: imageUrl,
       savedAt: DateTime.now(),
     );
-
-    if (client != null) {
-      try {
-        await client.from(_tableName).upsert({
-          'user_id': FirebaseAuth.instance.currentUser?.uid,
-          'word': card.word,
-          'topic': card.topic,
-          'phonetic': card.phonetic,
-          'meaning': card.meaning,
-          'word_type': card.wordType,
-          'example': card.example,
-          'image_url': card.imageUrl,
-          'saved_at': card.savedAt.toIso8601String(),
-        });
-      } on PostgrestException catch (error) {
-        if (error.message.toLowerCase().contains('user_id')) {
-          throw Exception(
-            'Lỗi: Bảng flashcards trong Supabase chưa có cột "user_id". Vui lòng mở Supabase và thêm cột "user_id" kiểu "text".',
-          );
-        }
-        throw Exception('Lỗi lưu từ mới lên Supabase: ${error.message}');
-      }
-    }
 
     _upsertLocalCard(card);
     return card;
@@ -498,67 +594,12 @@ class SavedCardsRepository {
       throw Exception('Vui lòng nhập nghĩa tiếng Việt');
     }
 
-    final existingWord = await findExistingWord(normalized);
     final client = _clientOrNull;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     final timestamp = DateTime.now();
     var imageUrl = existingImageUrl?.trim();
     if (imageUrl != null && imageUrl.isEmpty) {
       imageUrl = null;
-    }
-
-    if (removeImage) {
-      imageBytes = null;
-      imageUrl = null;
-    }
-
-    if (client != null &&
-        !removeImage &&
-        imageBytes != null &&
-        imageBytes.isNotEmpty) {
-      try {
-        imageUrl = await _uploadImage(client, imageBytes, normalized);
-      } catch (_) {
-        imageUrl = null;
-      }
-    }
-
-    if (client != null) {
-      final payload = {
-        'user_id': FirebaseAuth.instance.currentUser?.uid,
-        'word': word.trim(),
-        'topic': topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
-        'phonetic': phonetic.trim(),
-        'meaning': meaning.trim(),
-        'word_type': wordType,
-        'example': example.trim(),
-        if (removeImage) 'image_url': null,
-        'image_url': ?imageUrl,
-        'saved_at': timestamp.toIso8601String(),
-      };
-
-      try {
-        if (existingWord != null) {
-          await client
-              .from(_tableName)
-              .update(payload)
-              .eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '')
-              .ilike('word', normalized);
-        } else {
-          await client.from(_tableName).upsert(payload);
-        }
-      } catch (_) {
-        if (existingWord != null) {
-          try {
-            await client
-                .from(_tableName)
-                .update(payload)
-                .eq('user_id', FirebaseAuth.instance.currentUser?.uid ?? '')
-                .ilike('word', normalized);
-          } catch (_) {
-            // Ignore remote issues and keep the local save.
-          }
-        }
-      }
     }
 
     final localExistingIndex = _cards.indexWhere(
@@ -567,11 +608,86 @@ class SavedCardsRepository {
     final localExisting = localExistingIndex >= 0
         ? _cards[localExistingIndex]
         : null;
+
+    String vocabularyId = localExisting?.vocabularyId ?? '';
+
+    if (removeImage) {
+      imageBytes = null;
+      imageUrl = null;
+    }
+
+    if (client != null && uid != null) {
+      try {
+        if (vocabularyId.isEmpty) {
+          vocabularyId = await _resolveOrCreateVocabularyId(
+            word: normalized,
+            topic: topic,
+            hintVi: meaning,
+          );
+        }
+
+        // Upload new image if provided
+        if (!removeImage && imageBytes != null && imageBytes.isNotEmpty) {
+          try {
+            imageUrl = await _uploadImage(client, imageBytes, normalized);
+          } catch (_) {
+            imageUrl = null;
+          }
+        }
+
+        // Update or insert saved_card
+        if (localExisting != null) {
+          if (vocabularyId.isNotEmpty) {
+            await client
+                .from('saved_cards')
+                .update({
+                  'vocabulary_id': vocabularyId,
+                  'topic': topic,
+                  if (removeImage) 'image_url': null,
+                  if (!removeImage && imageUrl != null) 'image_url': imageUrl,
+                  'created_at': timestamp.toIso8601String(),
+                })
+                .eq('user_id', uid)
+                .eq('id', localExisting.id);
+          } else {
+            debugPrint(
+              'Skip remote upsertManualCardFromReview(update): missing vocabulary_id for "$normalized".',
+            );
+          }
+        } else {
+          vocabularyId = await _resolveOrCreateVocabularyId(
+            word: normalized,
+            topic: topic,
+            hintVi: meaning,
+          );
+
+          if (vocabularyId.isNotEmpty) {
+            await client.from('saved_cards').insert({
+              'user_id': uid,
+              'vocabulary_id': vocabularyId,
+              'topic': topic,
+              'image_url': imageUrl,
+              'created_at': timestamp.toIso8601String(),
+            });
+          } else {
+            debugPrint(
+              'Skip remote upsertManualCardFromReview(insert): missing vocabulary_id for "$normalized".',
+            );
+          }
+        }
+      } catch (_) {
+        // Ignore remote issues and keep the local save.
+      }
+    }
+
+    final topicCanonical = TopicClassifier.toVietnameseCanonical(
+      topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
+    );
+
     final card = SavedCard(
       id: normalized,
-      topic: TopicClassifier.toVietnameseCanonical(
-        topic.trim().isEmpty ? 'Từ mới' : topic.trim(),
-      ),
+      vocabularyId: vocabularyId,
+      topic: topicCanonical,
       word: word.trim(),
       phonetic: phonetic.trim(),
       meaning: meaning.trim(),
@@ -599,36 +715,43 @@ class SavedCardsRepository {
     final client = _clientOrNull;
     final timestamp = DateTime.now();
     String? imageUrl;
+    String vocabularyId = '';
 
     if (client != null) {
       try {
+        vocabularyId = await _resolveOrCreateVocabularyId(
+          word: result.normalizedWord,
+          topic: result.topic,
+          hintVi: result.vietnameseMeaning,
+        );
+
         if (imageBytes != null && imageBytes.isNotEmpty) {
-          imageUrl = await _uploadImage(
-            client,
-            imageBytes,
-            result.normalizedWord,
-          );
+          try {
+            imageUrl = await _uploadImage(
+              client,
+              imageBytes,
+              result.normalizedWord,
+            );
+          } catch (_) {
+            imageUrl = null;
+          }
         }
 
-        final updatedRow = await client
-            .from(_tableName)
-            .update({
-              'word': result.word,
-              'topic': result.topic,
-              'phonetic': result.phonetic,
-              'meaning': result.vietnameseMeaning,
-              'word_type': result.wordType,
-              'example': result.exampleSentence,
-              'image_url': ?imageUrl,
-              'saved_at': timestamp.toIso8601String(),
-            })
-            .eq('user_id', uid)
-            .eq('word', existingWord)
-            .select()
-            .maybeSingle();
-
-        if (updatedRow == null) {
-          throw Exception('Khong tim thay tu can cap nhat trong Supabase');
+        if (vocabularyId.isNotEmpty) {
+          await client
+              .from('saved_cards')
+              .update({
+                'vocabulary_id': vocabularyId,
+                'topic': result.topic,
+                if (imageUrl != null) 'image_url': imageUrl,
+                'created_at': timestamp.toIso8601String(),
+              })
+              .eq('user_id', uid)
+              .eq('id', existingWord);
+        } else {
+          debugPrint(
+            'Skip remote replaceExistingWord: missing vocabulary_id for "${result.normalizedWord}".',
+          );
         }
       } catch (_) {
         // Remote update is optional.
@@ -637,6 +760,7 @@ class SavedCardsRepository {
 
     final card = SavedCard.fromAnalysisResult(
       result,
+      vocabularyId,
       imageBytes,
       remoteUrl: imageUrl,
       timestamp: timestamp,
@@ -691,9 +815,9 @@ class SavedCardsRepository {
     final client = _clientOrNull;
     if (client != null) {
       _remoteSubscription ??= client
-          .from(_tableName)
-          .stream(primaryKey: ['user_id', 'word'])
-          .order('saved_at', ascending: false)
+          .from('saved_cards')
+          .stream(primaryKey: ['user_id', 'id'])
+          .order('created_at', ascending: false)
           .listen((rows) {
             final uid = FirebaseAuth.instance.currentUser?.uid;
             final userRows = uid != null
