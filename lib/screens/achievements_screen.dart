@@ -1,13 +1,20 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/firestore_sync_status.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/xp_service.dart';
 
 class AchievementsScreen extends StatefulWidget {
-  const AchievementsScreen({super.key});
+  final bool isActive;
+
+  const AchievementsScreen({super.key, this.isActive = false});
 
   @override
   State<AchievementsScreen> createState() => _AchievementsScreenState();
@@ -17,6 +24,14 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     with TickerProviderStateMixin {
   late final AnimationController _ambientController;
   late final AnimationController _progressController;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _leaderboardProfileSubscription;
+  Timer? _oasisSyncDebounce;
+  Timer? _leaderboardSyncDebounce;
+  String _lastOasisSyncDigest = '';
+  String _lastLeaderboardSyncDigest = '';
+  bool _isSyncingOasis = false;
+  bool _isSyncingLeaderboard = false;
 
   int get _userTotalCardsStudied => SavedCardsRepository
       .instance
@@ -31,6 +46,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   int get _userTotalXp => XPService.instance.xpNotifier.value;
 
   bool _showAllBadges = false;
+  List<Map<String, dynamic>> _leaderboardEntries = <Map<String, dynamic>>[];
 
   static const List<Map<String, dynamic>> _oasisElements = [
     {
@@ -279,6 +295,475 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     return bots;
   }
 
+  List<Map<String, dynamic>> _parseFriendEntries(dynamic raw) {
+    if (raw is! List) {
+      return <Map<String, dynamic>>[];
+    }
+
+    final parsed = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    for (final item in raw) {
+      if (item is! Map) {
+        continue;
+      }
+      final uid = item['uid']?.toString().trim() ?? '';
+      if (uid.isEmpty || seen.contains(uid)) {
+        continue;
+      }
+      seen.add(uid);
+      parsed.add(<String, dynamic>{
+        'uid': uid,
+        'social_id': item['social_id']?.toString().trim() ?? '',
+        'display_name': item['display_name']?.toString().trim() ?? '',
+        'avatar_base64': item['avatar_base64']?.toString().trim() ?? '',
+        'email': item['email']?.toString().trim() ?? '',
+      });
+    }
+    return parsed;
+  }
+
+  Future<void> _refreshLeaderboardEntries(
+    List<Map<String, dynamic>> friends,
+    {String selfAvatarBase64 = '', String selfDisplayName = '',}
+  ) async {
+    if (_isSyncingLeaderboard) {
+      return;
+    }
+
+    final signature = jsonEncode(<String, dynamic>{
+      'friends': friends.map((friend) => friend['uid']?.toString() ?? '').toList(),
+      'me_xp': _userTotalXp,
+      'me_avatar': selfAvatarBase64,
+      'me_name': selfDisplayName,
+    });
+
+    if (signature == _lastLeaderboardSyncDigest && _leaderboardEntries.isNotEmpty) {
+      return;
+    }
+
+    _isSyncingLeaderboard = true;
+    try {
+      final fetchedFriends = <Map<String, dynamic>>[];
+      for (final friend in friends) {
+        final uid = friend['uid']?.toString().trim() ?? '';
+        if (uid.isEmpty) {
+          continue;
+        }
+
+        try {
+          final snap = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          final data = snap.data() ?? <String, dynamic>{};
+          final xp = (data['xp'] as num?)?.toInt() ?? 0;
+          final displayName =
+              data['display_name']?.toString().trim().isNotEmpty == true
+              ? data['display_name'].toString().trim()
+              : (friend['display_name']?.toString().trim().isNotEmpty == true
+                  ? friend['display_name'].toString().trim()
+                  : friend['social_id']?.toString().trim() ?? 'Bạn bè');
+          final avatarBase64 =
+              data['avatar_base64']?.toString().trim().isNotEmpty == true
+              ? data['avatar_base64'].toString().trim()
+              : friend['avatar_base64']?.toString().trim() ?? '';
+
+          fetchedFriends.add(<String, dynamic>{
+            'uid': uid,
+            'name': displayName,
+            'avatarBase64': avatarBase64,
+            'avatar': '👤',
+            'xp': xp,
+            'isMe': false,
+          });
+        } catch (_) {
+          fetchedFriends.add(<String, dynamic>{
+            'uid': uid,
+            'name': friend['display_name']?.toString().trim().isNotEmpty == true
+                ? friend['display_name'].toString().trim()
+                : friend['social_id']?.toString().trim() ?? 'Bạn bè',
+            'avatarBase64': friend['avatar_base64']?.toString().trim() ?? '',
+            'avatar': '👤',
+            'xp': 0,
+            'isMe': false,
+          });
+        }
+      }
+
+      final fillCount = (5 - (fetchedFriends.length + 1)).clamp(0, 4);
+      final fakeBots = _getDailySeededGhosts()
+          .where((entry) => entry['isMe'] != true)
+          .take(fillCount)
+          .toList();
+
+      final combined = <Map<String, dynamic>>[
+        ...fetchedFriends,
+        ...fakeBots,
+        <String, dynamic>{
+          'name': selfDisplayName.trim().isNotEmpty
+              ? selfDisplayName.trim()
+              : 'Bạn',
+          'avatar': '🧑',
+          'avatarBase64': selfAvatarBase64,
+          'xp': _userTotalXp,
+          'isMe': true,
+        },
+      ];
+
+      combined.sort((a, b) => (b['xp'] as int).compareTo(a['xp'] as int));
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _leaderboardEntries = combined.take(5).toList();
+        _lastLeaderboardSyncDigest = signature;
+      });
+    } finally {
+      _isSyncingLeaderboard = false;
+    }
+  }
+
+  Widget _buildLeaderboardAvatar(Map<String, dynamic> entry) {
+    final avatarBase64 = entry['avatarBase64']?.toString().trim() ?? '';
+    if (avatarBase64.isNotEmpty) {
+      try {
+        final avatarBytes = base64Decode(avatarBase64);
+        if (avatarBytes.isNotEmpty) {
+          return CircleAvatar(
+            radius: 14,
+            backgroundColor: Colors.white,
+            backgroundImage: MemoryImage(avatarBytes),
+          );
+        }
+      } catch (_) {
+        // Fall back below.
+      }
+    }
+
+    final avatarText = entry['avatar']?.toString() ?? '👤';
+    return Text(avatarText, style: const TextStyle(fontSize: 24));
+  }
+
+  void _scheduleLeaderboardRefresh(
+    List<Map<String, dynamic>> friends, {
+    String selfAvatarBase64 = '',
+    String selfDisplayName = '',
+  }) {
+    _leaderboardSyncDebounce?.cancel();
+    _leaderboardSyncDebounce = Timer(const Duration(milliseconds: 400), () {
+      unawaited(
+        _refreshLeaderboardEntries(
+          friends,
+          selfAvatarBase64: selfAvatarBase64,
+          selfDisplayName: selfDisplayName,
+        ),
+      );
+    });
+  }
+
+  void _bindLeaderboardStream() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _leaderboardProfileSubscription?.cancel();
+      _leaderboardProfileSubscription = null;
+      return;
+    }
+
+    if (_leaderboardProfileSubscription != null) {
+      return;
+    }
+
+    _leaderboardProfileSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen((snapshot) {
+          final data = snapshot.data() ?? <String, dynamic>{};
+          final friends = _parseFriendEntries(data['friends']);
+          final selfAvatarBase64 = data['avatar_base64']?.toString().trim() ?? '';
+          final selfDisplayName = data['display_name']?.toString().trim() ?? 'Bạn';
+          _scheduleLeaderboardRefresh(
+            friends,
+            selfAvatarBase64: selfAvatarBase64,
+            selfDisplayName: selfDisplayName,
+          );
+        });
+  }
+
+  DocumentReference<Map<String, dynamic>>? _profileDoc() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return FirebaseFirestore.instance.collection('users').doc(user.uid);
+  }
+
+  int _progressForElement(Map<String, dynamic> e) {
+    if (e['reqType'] == 'scans') {
+      return _userTotalScans;
+    }
+    if (e['reqType'] == 'cards') {
+      return _userTotalCardsStudied;
+    }
+    if (e['reqType'] == 'Số ngày') {
+      return _currentStreak;
+    }
+    if (e['reqType'] == 'xp') {
+      return _userTotalXp;
+    }
+    return 0;
+  }
+
+  Map<String, dynamic> _buildOasisCollectionAchievementsPayload() {
+    final entries = _oasisElements.map((e) {
+      return <String, dynamic>{
+        'id': e['id'],
+        'name': e['name'],
+        'desc': e['desc'],
+        'icon': e['icon'],
+        'req_type': e['reqType'],
+        'req_value': e['reqValue'],
+        'progress_value': _progressForElement(e),
+        'unlocked': _isElementUnlocked(e),
+      };
+    }).toList();
+
+    final unlockedIds = entries
+        .where((e) => e['unlocked'] == true)
+        .map((e) => e['id'].toString())
+        .toList();
+
+    return <String, dynamic>{
+      'entries': entries,
+      'unlocked_ids': unlockedIds,
+      'unlocked_count': unlockedIds.length,
+      'total_count': _oasisElements.length,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> _buildMagicalOasisStatePayload() {
+    final unlockedElements = _oasisElements
+        .where((e) => _isElementUnlocked(e))
+        .toList();
+    final unlockedIds = unlockedElements
+        .map((e) => e['id'].toString())
+        .toList();
+
+    return <String, dynamic>{
+      'is_barren': unlockedElements.isEmpty,
+      'unlocked_elements': unlockedIds,
+      'has_magic': unlockedIds.contains('magic'),
+      'stats': <String, dynamic>{
+        'streak': _currentStreak,
+        'total_scans': _userTotalScans,
+        'cards_studied': _userTotalCardsStudied,
+        'total_xp': _userTotalXp,
+        'current_league': _currentLeague['name'],
+      },
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+  }
+
+  int _fallbackStatValue(dynamic localValue, dynamic remoteValue) {
+    final local = localValue is num ? localValue.toInt() : 0;
+    if (local > 0) {
+      return local;
+    }
+    final remote = remoteValue is num ? remoteValue.toInt() : 0;
+    return remote;
+  }
+
+  Map<String, dynamic> _remoteStatsFromSnapshot(
+    Map<String, dynamic>? data,
+  ) {
+    final oasisState = data?['magical_oasis_state'];
+    if (oasisState is! Map) {
+      return <String, dynamic>{};
+    }
+
+    final stats = oasisState['stats'];
+    if (stats is! Map) {
+      return <String, dynamic>{};
+    }
+
+    return Map<String, dynamic>.from(stats.cast<String, dynamic>());
+  }
+
+  void _scheduleOasisSync({bool immediate = false}) {
+    if (!widget.isActive) {
+      return;
+    }
+
+    _oasisSyncDebounce?.cancel();
+    if (immediate) {
+      unawaited(_syncOasisDataToFirebase());
+      return;
+    }
+
+    _oasisSyncDebounce = Timer(const Duration(milliseconds: 700), () {
+      unawaited(_syncOasisDataToFirebase());
+    });
+  }
+
+  Future<void> _syncOasisDataToFirebase() async {
+    if (!widget.isActive) {
+      return;
+    }
+
+    if (_isSyncingOasis) {
+      return;
+    }
+
+    final docRef = _profileDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    Map<String, dynamic> remoteData = <String, dynamic>{};
+    try {
+      final snapshot = await docRef.get();
+      remoteData = snapshot.data() ?? <String, dynamic>{};
+    } catch (_) {
+      remoteData = <String, dynamic>{};
+    }
+
+    final remoteStats = _remoteStatsFromSnapshot(remoteData);
+    final remoteCollection = remoteData['oasis_collection_achievements'];
+    final remoteOasis = remoteData['magical_oasis_state'];
+
+    final remoteCollectionUnlockedCount = remoteCollection is Map
+        ? (remoteCollection['unlocked_count'] as num?)?.toInt() ?? 0
+        : 0;
+
+    final localCardsStudied = _userTotalCardsStudied;
+    final localScans = _userTotalScans;
+    final localStreak = _currentStreak;
+    final localXp = _userTotalXp;
+
+    if (remoteCollectionUnlockedCount > 0 &&
+        localCardsStudied == 0 &&
+        localScans == 0 &&
+        localStreak == 0 &&
+        localXp == 0) {
+      final remoteStatsCards = remoteStats['cards_studied'] is num
+          ? (remoteStats['cards_studied'] as num).toInt()
+          : 0;
+      final remoteStatsScans = remoteStats['total_scans'] is num
+          ? (remoteStats['total_scans'] as num).toInt()
+          : 0;
+      final remoteStatsStreak = remoteStats['streak'] is num
+          ? (remoteStats['streak'] as num).toInt()
+          : 0;
+      final remoteStatsXp = remoteStats['total_xp'] is num
+          ? (remoteStats['total_xp'] as num).toInt()
+          : 0;
+      if (remoteStatsCards > 0 ||
+          remoteStatsScans > 0 ||
+          remoteStatsStreak > 0 ||
+          remoteStatsXp > 0 ||
+          remoteOasis is Map) {
+        return;
+      }
+    }
+
+    final collectionPayload = _buildOasisCollectionAchievementsPayload();
+    final oasisPayload = _buildMagicalOasisStatePayload();
+    final mergedCollectionPayload = <String, dynamic>{
+      ...collectionPayload,
+      if (remoteCollection is Map &&
+          collectionPayload['unlocked_count'] == 0 &&
+          (remoteCollection['unlocked_count'] as num?)?.toInt() != null &&
+          (remoteCollection['unlocked_count'] as num?)!.toInt() > 0)
+        ...Map<String, dynamic>.from(remoteCollection.cast<String, dynamic>()),
+    };
+    final mergedStats = <String, dynamic>{
+      'streak': _fallbackStatValue(
+        _currentStreak,
+        remoteStats['streak'],
+      ),
+      'total_scans': _fallbackStatValue(
+        _userTotalScans,
+        remoteStats['total_scans'],
+      ),
+      'cards_studied': _fallbackStatValue(
+        _userTotalCardsStudied,
+        remoteStats['cards_studied'],
+      ),
+      'total_xp': _fallbackStatValue(
+        _userTotalXp,
+        remoteStats['total_xp'],
+      ),
+      'current_league': (_userTotalXp > 0)
+          ? _currentLeague['name']
+          : (remoteStats['current_league']?.toString() ?? _currentLeague['name']),
+    };
+    final mergedOasisPayload = <String, dynamic>{
+      ...oasisPayload,
+      'stats': mergedStats,
+      if (remoteOasis is Map &&
+          oasisPayload['is_barren'] == true &&
+          remoteOasis['is_barren'] == false)
+        ...Map<String, dynamic>.from(remoteOasis.cast<String, dynamic>()),
+    };
+    final syncDigest = jsonEncode(<String, dynamic>{
+      'collection': mergedCollectionPayload,
+      'oasis': mergedOasisPayload,
+    });
+
+    if (syncDigest == _lastOasisSyncDigest) {
+      return;
+    }
+
+    _isSyncingOasis = true;
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/${docRef.id}',
+        reason: 'đồng bộ tiến độ bộ sưu tập và ốc đảo kỳ diệu',
+      );
+      await docRef.set({
+        'oasis_collection_achievements': mergedCollectionPayload,
+        'magical_oasis_state': mergedOasisPayload,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      _lastOasisSyncDigest = syncDigest;
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/${docRef.id}',
+        message: 'Đã đồng bộ dữ liệu ốc đảo lên Firestore',
+      );
+    } catch (error) {
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/${docRef.id}',
+        operation: 'sync oasis achievement data',
+        error: error,
+      );
+    } finally {
+      _isSyncingOasis = false;
+    }
+  }
+
+  void _onOasisProgressSourcesChanged() {
+    if (!widget.isActive) {
+      return;
+    }
+    _scheduleOasisSync();
+  }
+
+  @override
+  void didUpdateWidget(covariant AchievementsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!oldWidget.isActive && widget.isActive) {
+      _scheduleOasisSync();
+      return;
+    }
+
+    if (oldWidget.isActive && !widget.isActive) {
+      _oasisSyncDebounce?.cancel();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -291,13 +776,58 @@ class _AchievementsScreenState extends State<AchievementsScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..forward();
+
+    XPService.instance.xpNotifier.addListener(_onOasisProgressSourcesChanged);
+    XPService.instance.streakNotifier.addListener(
+      _onOasisProgressSourcesChanged,
+    );
+    SavedCardsRepository.instance.cardsNotifier.addListener(
+      _onOasisProgressSourcesChanged,
+    );
+    XPService.instance.xpNotifier.addListener(_onLeaderboardProgressChanged);
+    _bindLeaderboardStream();
   }
 
   @override
   void dispose() {
+    _oasisSyncDebounce?.cancel();
+    _leaderboardSyncDebounce?.cancel();
+    XPService.instance.xpNotifier.removeListener(_onOasisProgressSourcesChanged);
+    XPService.instance.streakNotifier.removeListener(
+      _onOasisProgressSourcesChanged,
+    );
+    SavedCardsRepository.instance.cardsNotifier.removeListener(
+      _onOasisProgressSourcesChanged,
+    );
+    XPService.instance.xpNotifier.removeListener(_onLeaderboardProgressChanged);
+    _leaderboardProfileSubscription?.cancel();
     _ambientController.dispose();
     _progressController.dispose();
     super.dispose();
+  }
+
+  void _onLeaderboardProgressChanged() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get()
+        .then((snap) {
+          final data = snap.data() ?? <String, dynamic>{};
+          final friends = _parseFriendEntries(data['friends']);
+          final selfAvatarBase64 = data['avatar_base64']?.toString().trim() ?? '';
+          final selfDisplayName = data['display_name']?.toString().trim() ?? 'Bạn';
+          _scheduleLeaderboardRefresh(
+            friends,
+            selfAvatarBase64: selfAvatarBase64,
+            selfDisplayName: selfDisplayName,
+          );
+        })
+        .catchError((_) {});
   }
 
   @override
@@ -557,7 +1087,9 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   }
 
   Widget _buildGhostPanel() {
-    final ghosts = _getDailySeededGhosts();
+    final leaderboard = _leaderboardEntries.isNotEmpty
+        ? _leaderboardEntries
+        : _getDailySeededGhosts();
     return _GlassPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,7 +1111,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
             ),
           ),
           const SizedBox(height: 12),
-          ...ghosts.map((g) {
+          ...leaderboard.map((g) {
             final isMe = g['isMe'] == true;
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -614,7 +1146,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
               ),
               child: Row(
                 children: [
-                  Text(g['avatar'], style: const TextStyle(fontSize: 24)),
+                  _buildLeaderboardAvatar(g),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(

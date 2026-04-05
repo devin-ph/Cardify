@@ -13,7 +13,13 @@ import '../models/saved_card.dart';
 import 'vocabulary_service.dart';
 
 class SavedCardsRepository {
-  SavedCardsRepository._();
+  SavedCardsRepository._() {
+    FirebaseAuth.instance.authStateChanges().listen((_) {
+      _useUuidCompatibleUserId = false;
+      _resolvedCardsTableName = null;
+      watchCards();
+    });
+  }
 
   static final SavedCardsRepository instance = SavedCardsRepository._();
 
@@ -28,6 +34,8 @@ class SavedCardsRepository {
   String? _watchingScope;
   bool _localStateLoaded = false;
   String? _loadedScope;
+  bool _useUuidCompatibleUserId = false;
+  String? _resolvedCardsTableName;
 
   static const String _localCardsKey = 'saved_cards_local_json';
   static const String _localKnownWordsKey = 'known_words_local_json';
@@ -58,6 +66,105 @@ class SavedCardsRepository {
   }
 
   String get _bucketName => _dotenvValue('SUPABASE_BUCKET', 'btl');
+
+  String get _cardsTableName => _dotenvValue('SUPABASE_TABLE', 'saved_cards');
+
+  List<String> _cardsTableCandidates() {
+    final configured = _cardsTableName.trim().isEmpty
+        ? 'saved_cards'
+        : _cardsTableName.trim();
+    final ordered = <String>[
+      if (_resolvedCardsTableName != null &&
+          _resolvedCardsTableName!.trim().isNotEmpty)
+        _resolvedCardsTableName!.trim(),
+      configured,
+      'saved_cards',
+    ];
+    final seen = <String>{};
+    return ordered.where((name) => seen.add(name)).toList();
+  }
+
+  bool _looksLikeUuid(String value) {
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value);
+  }
+
+  String _uuidCompatibleUserId(String firebaseUid) {
+    final trimmed = firebaseUid.trim();
+    if (trimmed.isEmpty) {
+      return '00000000-0000-4000-8000-000000000000';
+    }
+    if (_looksLikeUuid(trimmed)) {
+      return trimmed.toLowerCase();
+    }
+
+    final bytes = utf8.encode(trimmed);
+    final buffer = StringBuffer();
+    var index = 0;
+    while (buffer.length < 32) {
+      final value = bytes[index % bytes.length];
+      buffer.write(value.toRadixString(16).padLeft(2, '0'));
+      index++;
+    }
+
+    final chars = buffer.toString().substring(0, 32).split('');
+    chars[12] = '4';
+    final variantNibble = int.parse(chars[16], radix: 16);
+    chars[16] = ((variantNibble & 0x3) | 0x8).toRadixString(16);
+    final hex = chars.join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+  }
+
+  bool _isInvalidUuidInput(PostgrestException error) {
+    final message = error.message.toLowerCase();
+    return error.code == '22P02' && message.contains('uuid');
+  }
+
+  bool _isMissingTableError(PostgrestException error) {
+    final code = error.code?.toLowerCase() ?? '';
+    final message = error.message.toLowerCase();
+    return code == '42p01' ||
+        code == 'pgrst205' ||
+        message.contains('could not find the table') ||
+        (message.contains('relation') && message.contains('does not exist'));
+  }
+
+  bool _isMissingColumnError(PostgrestException error, {String? columnName}) {
+    final code = error.code?.toLowerCase() ?? '';
+    final message = error.message.toLowerCase();
+    if (code != '42703' && code != 'pgrst204') {
+      return false;
+    }
+    if (columnName == null || columnName.trim().isEmpty) {
+      return message.contains('column');
+    }
+    return message.contains(columnName.toLowerCase());
+  }
+
+  Future<T> _runWithSupabaseUserId<T>(
+    String firebaseUid,
+    Future<T> Function(String supabaseUid) operation,
+  ) async {
+    final primaryUid = _useUuidCompatibleUserId
+        ? _uuidCompatibleUserId(firebaseUid)
+        : firebaseUid;
+
+    try {
+      return await operation(primaryUid);
+    } on PostgrestException catch (error) {
+      final canRetryWithUuid =
+          !_useUuidCompatibleUserId &&
+          !_looksLikeUuid(firebaseUid) &&
+          _isInvalidUuidInput(error);
+      if (!canRetryWithUuid) {
+        rethrow;
+      }
+
+      _useUuidCompatibleUserId = true;
+      return operation(_uuidCompatibleUserId(firebaseUid));
+    }
+  }
 
   String _dotenvValue(String key, String fallback) {
     try {
@@ -317,8 +424,530 @@ class SavedCardsRepository {
       }
 
       _publishCards();
+
+      final client = _clientOrNull;
+      if (client != null) {
+        unawaited(_syncLocalCardsToRemoteBestEffort(client));
+      }
     } catch (_) {
       // Ignore local load failures and fall back to remote/runtime state.
+    }
+  }
+
+  Future<bool> _remoteCardExistsByVocabularyId(
+    SupabaseClient client,
+    String firebaseUid,
+    String vocabularyId,
+    String normalizedWord,
+  ) async {
+    final normalizedVocabularyId = vocabularyId.trim();
+    if (normalizedVocabularyId.isEmpty) {
+      return false;
+    }
+
+    final candidates = _cardsTableCandidates();
+    for (var index = 0; index < candidates.length; index++) {
+      final tableName = candidates[index];
+      try {
+        final row = await _runWithSupabaseUserId(firebaseUid, (supabaseUid) {
+          return client
+              .from(tableName)
+              .select('id')
+              .eq('user_id', supabaseUid)
+              .eq('vocabulary_id', normalizedVocabularyId)
+              .limit(1)
+              .maybeSingle();
+        });
+
+        _resolvedCardsTableName = tableName;
+        if (row != null) {
+          return true;
+        }
+      } on PostgrestException catch (error) {
+        final canFallbackToWord =
+            _isMissingColumnError(error, columnName: 'vocabulary_id') &&
+            normalizedWord.trim().isNotEmpty;
+        if (canFallbackToWord) {
+          try {
+            final row = await _runWithSupabaseUserId(firebaseUid, (
+              supabaseUid,
+            ) {
+              return client
+                  .from(tableName)
+                  .select('id')
+                  .eq('user_id', supabaseUid)
+                  .ilike('word', normalizedWord.trim())
+                  .limit(1)
+                  .maybeSingle();
+            });
+            _resolvedCardsTableName = tableName;
+            if (row != null) {
+              return true;
+            }
+            return false;
+          } on PostgrestException catch (_) {
+            return false;
+          }
+        }
+
+        final canFallback =
+            _isMissingTableError(error) && index < candidates.length - 1;
+        if (canFallback) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    return false;
+  }
+
+  Future<bool> _remoteCardExistsByWord(
+    SupabaseClient client,
+    String firebaseUid,
+    String normalizedWord,
+  ) async {
+    final targetWord = normalizedWord.trim();
+    if (targetWord.isEmpty) {
+      return false;
+    }
+
+    final candidates = _cardsTableCandidates();
+    for (var index = 0; index < candidates.length; index++) {
+      final tableName = candidates[index];
+      try {
+        final row = await _runWithSupabaseUserId(firebaseUid, (supabaseUid) {
+          return client
+              .from(tableName)
+              .select('id')
+              .eq('user_id', supabaseUid)
+              .ilike('word', targetWord)
+              .limit(1)
+              .maybeSingle();
+        });
+        _resolvedCardsTableName = tableName;
+        if (row != null) {
+          return true;
+        }
+      } on PostgrestException catch (error) {
+        final canFallback =
+            _isMissingTableError(error) && index < candidates.length - 1;
+        if (canFallback) {
+          continue;
+        }
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  Future<void> _syncLocalCardsToRemoteBestEffort(SupabaseClient client) async {
+    final firebaseUid = FirebaseAuth.instance.currentUser?.uid;
+    if (firebaseUid == null || firebaseUid.isEmpty) {
+      return;
+    }
+
+    final localSnapshot = List<SavedCard>.from(_cards);
+    var changed = false;
+
+    for (final card in localSnapshot) {
+      final localWord = card.word.trim();
+      final localMeaning = card.meaning.trim();
+      final localTopic = card.topic.trim();
+      if (localWord.isEmpty) {
+        continue;
+      }
+
+      try {
+        var vocabularyId = card.vocabularyId.trim();
+        if (vocabularyId.isEmpty) {
+          vocabularyId = await _resolveOrCreateVocabularyId(
+            word: card.id,
+            topic: localTopic,
+            hintVi: localMeaning,
+          );
+        }
+
+        final existsRemotely = vocabularyId.isNotEmpty
+            ? await _remoteCardExistsByVocabularyId(
+                client,
+                firebaseUid,
+                vocabularyId,
+                localWord,
+              )
+            : await _remoteCardExistsByWord(client, firebaseUid, localWord);
+        if (!existsRemotely) {
+          final payloads = <Map<String, dynamic>>[
+            if (vocabularyId.isNotEmpty)
+              {
+                'vocabulary_id': vocabularyId,
+                'topic': localTopic,
+                'image_url': card.imageUrl,
+              },
+            {
+              'word': localWord,
+              'meaning': localMeaning,
+              'topic': localTopic,
+              'image_url': card.imageUrl,
+              'saved_at': card.savedAt.toIso8601String(),
+            },
+          ];
+          await _insertRemoteCardRow(client, firebaseUid, payloads);
+        }
+
+        if (card.vocabularyId.trim().isEmpty) {
+          final index = _cards.indexWhere((item) => item.id == card.id);
+          if (index >= 0) {
+            _cards[index] = SavedCard(
+              id: card.id,
+              vocabularyId: vocabularyId,
+              topic: card.topic,
+              word: card.word,
+              phonetic: card.phonetic,
+              meaning: card.meaning,
+              example: card.example,
+              wordType: card.wordType,
+              imageBytes: card.imageBytes,
+              imageUrl: card.imageUrl,
+              savedAt: card.savedAt,
+            );
+            changed = true;
+          }
+        }
+      } catch (_) {
+        // Keep local cards usable even if remote sync fails.
+      }
+    }
+
+    if (changed) {
+      _publishCards();
+      await _persistLocalState();
+    }
+  }
+
+  Future<void> _insertRemoteCardRow(
+    SupabaseClient client,
+    String firebaseUid,
+    List<Map<String, dynamic>> payloadCandidates,
+  ) async {
+    final candidates = _cardsTableCandidates();
+    PostgrestException? lastPostgrestError;
+    final sanitizedPayloadCandidates = payloadCandidates
+        .map((payload) => Map<String, dynamic>.from(payload))
+        .where((payload) => payload.isNotEmpty)
+        .toList();
+    if (sanitizedPayloadCandidates.isEmpty) {
+      return;
+    }
+
+    for (var index = 0; index < candidates.length; index++) {
+      final tableName = candidates[index];
+      for (final payload in sanitizedPayloadCandidates) {
+        try {
+          await _runWithSupabaseUserId(firebaseUid, (supabaseUid) {
+            final rowPayload = <String, dynamic>{
+              ...payload,
+              'user_id': supabaseUid,
+            };
+            return client.from(tableName).insert(rowPayload);
+          });
+          _resolvedCardsTableName = tableName;
+          return;
+        } on PostgrestException catch (error) {
+          lastPostgrestError = error;
+          if (_isMissingColumnError(error)) {
+            continue;
+          }
+          final canFallback =
+              _isMissingTableError(error) && index < candidates.length - 1;
+          if (canFallback) {
+            break;
+          }
+          rethrow;
+        }
+      }
+
+      if (lastPostgrestError != null &&
+          _isMissingTableError(lastPostgrestError) &&
+          index < candidates.length - 1) {
+        continue;
+      }
+      if (lastPostgrestError != null && _isMissingColumnError(lastPostgrestError)) {
+        // Tried all payload variants for this table, continue to the next table candidate.
+        if (index < candidates.length - 1) {
+          continue;
+        }
+      }
+    }
+
+    if (lastPostgrestError != null) {
+      throw lastPostgrestError;
+    }
+  }
+
+  Future<void> _updateRemoteCardRowById(
+    SupabaseClient client,
+    String firebaseUid,
+    String cardId,
+    Map<String, dynamic> payload,
+  ) async {
+    final candidates = _cardsTableCandidates();
+    PostgrestException? lastPostgrestError;
+
+    for (var index = 0; index < candidates.length; index++) {
+      final tableName = candidates[index];
+      try {
+        await _runWithSupabaseUserId(firebaseUid, (supabaseUid) {
+          return client
+              .from(tableName)
+              .update(payload)
+              .eq('user_id', supabaseUid)
+              .eq('id', cardId);
+        });
+        _resolvedCardsTableName = tableName;
+        return;
+      } on PostgrestException catch (error) {
+        lastPostgrestError = error;
+        final canFallback =
+            _isMissingTableError(error) && index < candidates.length - 1;
+        if (canFallback) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    if (lastPostgrestError != null) {
+      throw lastPostgrestError;
+    }
+  }
+
+  Future<List<SavedCard>> _hydrateRemoteCards(
+    SupabaseClient client,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (rows.isEmpty) {
+      return <SavedCard>[];
+    }
+
+    final normalizedRows = rows
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+
+    final vocabularyIds = <String>{};
+    for (final row in normalizedRows) {
+      final word = row['word']?.toString().trim() ?? '';
+      final vocabularyId = row['vocabulary_id']?.toString().trim() ?? '';
+      if (word.isEmpty && vocabularyId.isNotEmpty) {
+        vocabularyIds.add(vocabularyId);
+      }
+    }
+
+    if (vocabularyIds.isNotEmpty) {
+      try {
+        final hintsRaw = await client
+            .from('vocabulary_hints')
+            .select('id, meaning, hint_vi, topic')
+            .inFilter('id', vocabularyIds.toList());
+
+        final hintsById = <String, Map<String, dynamic>>{};
+        for (final raw in hintsRaw.whereType<Map>()) {
+          final hint = Map<String, dynamic>.from(raw.cast<String, dynamic>());
+          final id = hint['id']?.toString().trim() ?? '';
+          if (id.isNotEmpty) {
+            hintsById[id] = hint;
+          }
+        }
+
+        for (final row in normalizedRows) {
+          final vocabularyId = row['vocabulary_id']?.toString().trim() ?? '';
+          final hint = hintsById[vocabularyId];
+          if (hint == null) {
+            continue;
+          }
+
+          final rowWord = row['word']?.toString().trim() ?? '';
+          final rowMeaning = row['meaning']?.toString().trim() ?? '';
+          final rowTopic = row['topic']?.toString().trim() ?? '';
+
+          if (rowWord.isEmpty) {
+            row['word'] = hint['meaning']?.toString() ?? '';
+          }
+          if (rowMeaning.isEmpty) {
+            row['meaning'] = hint['hint_vi']?.toString() ?? '';
+          }
+          if (rowTopic.isEmpty) {
+            row['topic'] = hint['topic']?.toString() ?? '';
+          }
+        }
+      } catch (_) {
+        // Best-effort enrichment; keep using raw row when lookup fails.
+      }
+    }
+
+    return normalizedRows
+        .map(SavedCard.fromMap)
+        .where((card) => card.word.trim().isNotEmpty)
+        .toList();
+  }
+
+  Future<void> _mergeRemoteRows(
+    SupabaseClient client,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    final firebaseUid = FirebaseAuth.instance.currentUser?.uid;
+    if (firebaseUid == null || firebaseUid.isEmpty) {
+      return;
+    }
+
+    final rawUid = firebaseUid;
+    final uuidUid = _uuidCompatibleUserId(firebaseUid);
+    final userRows = rows
+        .where((row) {
+          final rowUserId = row['user_id']?.toString();
+          return rowUserId == rawUid || rowUserId == uuidUid;
+        })
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+
+    if (userRows.isEmpty) {
+      return;
+    }
+
+    if (rawUid != uuidUid &&
+        userRows.any((row) => row['user_id']?.toString() == uuidUid)) {
+      _useUuidCompatibleUserId = true;
+    }
+
+    final mapped = await _hydrateRemoteCards(client, userRows);
+    final merged = <String, SavedCard>{
+      for (final card in _cards) card.id: card,
+      for (final card in mapped) card.id: card,
+    };
+    _cards
+      ..clear()
+      ..addAll(merged.values.toList());
+    _publishCards();
+  }
+
+  void _ensureRemoteSubscription(SupabaseClient client) {
+    if (_remoteSubscription != null) {
+      return;
+    }
+
+    final candidates = _cardsTableCandidates();
+
+    void subscribeAt(int index) {
+      if (index < 0 || index >= candidates.length) {
+        return;
+      }
+
+      final tableName = candidates[index];
+      _remoteSubscription?.cancel();
+      _remoteSubscription = client
+          .from(tableName)
+          .stream(primaryKey: ['user_id', 'id'])
+          .listen(
+            (rows) {
+              _resolvedCardsTableName = tableName;
+              unawaited(_mergeRemoteRows(client, rows));
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              if (error is PostgrestException &&
+                  _isMissingTableError(error) &&
+                  index < candidates.length - 1) {
+                subscribeAt(index + 1);
+              }
+            },
+          );
+    }
+
+    subscribeAt(0);
+  }
+
+  Future<void> _loadRemoteCardsOnce(SupabaseClient client) async {
+    final firebaseUid = FirebaseAuth.instance.currentUser?.uid;
+    if (firebaseUid == null || firebaseUid.isEmpty) {
+      return;
+    }
+
+    Future<List<SavedCard>> readFromTable(String tableName) async {
+      dynamic response;
+      try {
+        response = await _runWithSupabaseUserId(firebaseUid, (supabaseUid) {
+          return client
+              .from(tableName)
+              .select()
+              .eq('user_id', supabaseUid)
+              .order('created_at', ascending: false);
+        });
+      } on PostgrestException catch (error) {
+        if (_isMissingTableError(error)) {
+          rethrow;
+        }
+
+        final message = error.message.toLowerCase();
+        final missingCreatedAt =
+            error.code == '42703' && message.contains('created_at');
+        if (!missingCreatedAt) {
+          rethrow;
+        }
+
+        // Some custom tables (for example flashcards) don't include created_at.
+        response = await _runWithSupabaseUserId(firebaseUid, (supabaseUid) {
+          return client.from(tableName).select().eq('user_id', supabaseUid);
+        });
+      }
+
+      if (response is! List) {
+        return <SavedCard>[];
+      }
+      final rows = response
+          .whereType<Map>()
+          .map(
+            (row) => Map<String, dynamic>.from(row.cast<String, dynamic>()),
+          )
+          .toList();
+
+      return _hydrateRemoteCards(client, rows);
+    }
+
+    try {
+      final candidates = _cardsTableCandidates();
+      for (var index = 0; index < candidates.length; index++) {
+        final tableName = candidates[index];
+        try {
+          final remoteCards = await readFromTable(tableName);
+          final hasRemoteData = remoteCards.isNotEmpty;
+          final isLastCandidate = index == candidates.length - 1;
+
+          if (hasRemoteData || _cards.isNotEmpty || isLastCandidate) {
+            _resolvedCardsTableName = tableName;
+            final merged = <String, SavedCard>{
+              for (final card in _cards) card.id: card,
+              for (final card in remoteCards) card.id: card,
+            };
+            _cards
+              ..clear()
+              ..addAll(merged.values.toList());
+            _publishCards();
+          }
+
+          if (hasRemoteData || _cards.isNotEmpty) {
+            return;
+          }
+        } on PostgrestException catch (error) {
+          final canFallback =
+              _isMissingTableError(error) && index < candidates.length - 1;
+          if (canFallback) {
+            continue;
+          }
+          rethrow;
+        }
+      }
+    } catch (_) {
+      // Best-effort remote load; realtime stream or local cache may still populate cards.
     }
   }
 
@@ -342,8 +971,23 @@ class SavedCardsRepository {
     required String hintVi,
   }) async {
     final normalizedWord = word.trim();
+    final normalizedHintVi = hintVi.trim();
     if (normalizedWord.isEmpty) {
       throw Exception('Không thể tạo bản ghi từ vựng do thiếu từ tiếng Anh');
+    }
+
+    final lookupCandidates = <String>{
+      normalizedWord,
+      if (normalizedHintVi.isNotEmpty) normalizedHintVi,
+    };
+
+    for (final candidate in lookupCandidates) {
+      final found = await VocabularyService.instance.findVocabularyIdByMeaning(
+        candidate,
+      );
+      if (found != null && found.isNotEmpty) {
+        return found;
+      }
     }
 
     var vocabularyId =
@@ -373,16 +1017,42 @@ class SavedCardsRepository {
     }
 
     // Fallback: insert may fail due duplicate/race or policy delay, so retry lookup.
-    vocabularyId =
-        await VocabularyService.instance.findVocabularyIdByMeaning(
-          normalizedWord,
-        ) ??
-        '';
-    if (vocabularyId.isNotEmpty) {
-      return vocabularyId;
+    for (final candidate in lookupCandidates) {
+      vocabularyId =
+          await VocabularyService.instance.findVocabularyIdByMeaning(
+            candidate,
+          ) ??
+          '';
+      if (vocabularyId.isNotEmpty) {
+        return vocabularyId;
+      }
     }
 
     return '';
+  }
+
+  Future<String?> _findExistingWordInTable({
+    required SupabaseClient client,
+    required String tableName,
+    required String firebaseUid,
+    required String normalizedWord,
+  }) async {
+    final row = await _runWithSupabaseUserId(firebaseUid, (supabaseUid) {
+      return client
+          .from(tableName)
+          .select('id, vocabulary_hints!inner(meaning)')
+          .eq('user_id', supabaseUid)
+          .ilike('vocabulary_hints.meaning', normalizedWord)
+          .limit(1)
+          .maybeSingle();
+    });
+
+    if (row != null && row['vocabulary_hints'] != null) {
+      _resolvedCardsTableName = tableName;
+      return row['vocabulary_hints']['meaning']?.toString();
+    }
+
+    return null;
   }
 
   Future<String?> findExistingWord(String normalizedWord) async {
@@ -397,24 +1067,36 @@ class SavedCardsRepository {
     }
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return null;
-
-    try {
-      final row = await client
-          .from('saved_cards')
-          .select('id, vocabulary_hints!inner(meaning)')
-          .eq('user_id', uid)
-          .ilike('vocabulary_hints.meaning', normalizedWord)
-          .limit(1)
-          .maybeSingle();
-
-      if (row != null && row['vocabulary_hints'] != null) {
-        return row['vocabulary_hints']['meaning']?.toString();
-      }
-      return null;
-    } catch (_) {
+    if (uid == null || uid.isEmpty) {
       return null;
     }
+
+    final candidates = _cardsTableCandidates();
+    for (var index = 0; index < candidates.length; index++) {
+      final tableName = candidates[index];
+      try {
+        final found = await _findExistingWordInTable(
+          client: client,
+          tableName: tableName,
+          firebaseUid: uid,
+          normalizedWord: normalizedWord,
+        );
+        if (found != null) {
+          return found;
+        }
+      } on PostgrestException catch (error) {
+        final canFallback =
+            _isMissingTableError(error) && index < candidates.length - 1;
+        if (canFallback) {
+          continue;
+        }
+        return null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   Future<SavedCard?> saveResult(
@@ -437,7 +1119,7 @@ class SavedCardsRepository {
     final timestamp = DateTime.now();
     String? imageUrl;
 
-    if (client != null && uid != null) {
+    if (client != null && uid != null && uid.isNotEmpty) {
       try {
         vocabularyId = await _resolveOrCreateVocabularyId(
           word: normalized,
@@ -455,19 +1137,25 @@ class SavedCardsRepository {
         }
 
         // Step 4: Insert to saved_cards only when vocabulary_id is available.
-        if (vocabularyId.isNotEmpty) {
-          await client.from('saved_cards').insert({
-            'user_id': uid,
-            'vocabulary_id': vocabularyId,
+        final payloads = <Map<String, dynamic>>[
+          if (vocabularyId.isNotEmpty)
+            {
+              'vocabulary_id': vocabularyId,
+              'topic': result.topic,
+              'image_url': imageUrl,
+            },
+          {
+            'word': result.word,
+            'meaning': result.vietnameseMeaning,
             'topic': result.topic,
+            'phonetic': result.phonetic,
+            'word_type': result.wordType,
+            'example': result.exampleSentence,
             'image_url': imageUrl,
-            'created_at': timestamp.toIso8601String(),
-          });
-        } else {
-          debugPrint(
-            'Skip remote saveResult: cannot create/resolve vocabulary_id for "$normalized".',
-          );
-        }
+            'saved_at': timestamp.toIso8601String(),
+          },
+        ];
+        await _insertRemoteCardRow(client, uid, payloads);
       } on StorageException catch (error) {
         throw Exception('Lỗi tải ảnh lên Supabase: ${error.message}');
       } on PostgrestException catch (error) {
@@ -512,7 +1200,7 @@ class SavedCardsRepository {
     String vocabularyId = '';
     String? imageUrl;
 
-    if (client != null && uid != null) {
+    if (client != null && uid != null && uid.isNotEmpty) {
       try {
         vocabularyId = await _resolveOrCreateVocabularyId(
           word: normalized,
@@ -530,23 +1218,29 @@ class SavedCardsRepository {
         }
 
         // Step 4: Insert to saved_cards only when vocabulary_id is available.
-        if (vocabularyId.isNotEmpty) {
-          await client.from('saved_cards').insert({
-            'user_id': uid,
-            'vocabulary_id': vocabularyId,
+        final payloads = <Map<String, dynamic>>[
+          if (vocabularyId.isNotEmpty)
+            {
+              'vocabulary_id': vocabularyId,
+              'topic': topic,
+              'image_url': imageUrl,
+            },
+          {
+            'word': word.trim(),
+            'meaning': meaning.trim(),
             'topic': topic,
+            'phonetic': phonetic.trim(),
+            'word_type': wordType?.trim(),
+            'example': example.trim(),
             'image_url': imageUrl,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        } else {
-          debugPrint(
-            'Skip remote addManualCard: cannot create/resolve vocabulary_id for "$normalized".',
-          );
-        }
+            'saved_at': DateTime.now().toIso8601String(),
+          },
+        ];
+        await _insertRemoteCardRow(client, uid, payloads);
       } on PostgrestException catch (error) {
         if (error.message.toLowerCase().contains('user_id')) {
           throw Exception(
-            'Lỗi: Bảng saved_cards trong Supabase chưa được cấu hình đúng.',
+            'Lỗi: Bảng $_cardsTableName trong Supabase chưa được cấu hình đúng.',
           );
         }
         throw Exception('Lỗi lưu từ mới lên Supabase: ${error.message}');
@@ -616,7 +1310,7 @@ class SavedCardsRepository {
       imageUrl = null;
     }
 
-    if (client != null && uid != null) {
+    if (client != null && uid != null && uid.isNotEmpty) {
       try {
         if (vocabularyId.isEmpty) {
           vocabularyId = await _resolveOrCreateVocabularyId(
@@ -638,17 +1332,12 @@ class SavedCardsRepository {
         // Update or insert saved_card
         if (localExisting != null) {
           if (vocabularyId.isNotEmpty) {
-            await client
-                .from('saved_cards')
-                .update({
-                  'vocabulary_id': vocabularyId,
-                  'topic': topic,
-                  if (removeImage) 'image_url': null,
-                  if (!removeImage && imageUrl != null) 'image_url': imageUrl,
-                  'created_at': timestamp.toIso8601String(),
-                })
-                .eq('user_id', uid)
-                .eq('id', localExisting.id);
+            await _updateRemoteCardRowById(client, uid, localExisting.id, {
+              'vocabulary_id': vocabularyId,
+              'topic': topic,
+              if (removeImage) 'image_url': null,
+              if (!removeImage && imageUrl != null) 'image_url': imageUrl,
+            });
           } else {
             debugPrint(
               'Skip remote upsertManualCardFromReview(update): missing vocabulary_id for "$normalized".',
@@ -661,19 +1350,25 @@ class SavedCardsRepository {
             hintVi: meaning,
           );
 
-          if (vocabularyId.isNotEmpty) {
-            await client.from('saved_cards').insert({
-              'user_id': uid,
-              'vocabulary_id': vocabularyId,
+          final payloads = <Map<String, dynamic>>[
+            if (vocabularyId.isNotEmpty)
+              {
+                'vocabulary_id': vocabularyId,
+                'topic': topic,
+                'image_url': imageUrl,
+              },
+            {
+              'word': word.trim(),
+              'meaning': meaning.trim(),
               'topic': topic,
+              'phonetic': phonetic.trim(),
+              'word_type': wordType?.trim(),
+              'example': example.trim(),
               'image_url': imageUrl,
-              'created_at': timestamp.toIso8601String(),
-            });
-          } else {
-            debugPrint(
-              'Skip remote upsertManualCardFromReview(insert): missing vocabulary_id for "$normalized".',
-            );
-          }
+              'saved_at': timestamp.toIso8601String(),
+            },
+          ];
+          await _insertRemoteCardRow(client, uid, payloads);
         }
       } catch (_) {
         // Ignore remote issues and keep the local save.
@@ -710,7 +1405,9 @@ class SavedCardsRepository {
     Uint8List? imageBytes,
   }) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) throw Exception('Người dùng chưa đăng nhập');
+    if (uid == null || uid.isEmpty) {
+      throw Exception('Người dùng chưa đăng nhập');
+    }
 
     final client = _clientOrNull;
     final timestamp = DateTime.now();
@@ -738,16 +1435,11 @@ class SavedCardsRepository {
         }
 
         if (vocabularyId.isNotEmpty) {
-          await client
-              .from('saved_cards')
-              .update({
-                'vocabulary_id': vocabularyId,
-                'topic': result.topic,
-                if (imageUrl != null) 'image_url': imageUrl,
-                'created_at': timestamp.toIso8601String(),
-              })
-              .eq('user_id', uid)
-              .eq('id', existingWord);
+          await _updateRemoteCardRowById(client, uid, existingWord, {
+            'vocabulary_id': vocabularyId,
+            'topic': result.topic,
+            if (imageUrl != null) 'image_url': imageUrl,
+          });
         } else {
           debugPrint(
             'Skip remote replaceExistingWord: missing vocabulary_id for "${result.normalizedWord}".',
@@ -792,8 +1484,12 @@ class SavedCardsRepository {
 
   Stream<List<SavedCard>> watchCards() {
     final scope = _storageScope();
+    final client = _clientOrNull;
 
     if (_watchingCards && _watchingScope == scope) {
+      if (_remoteSubscription == null && client != null) {
+        _ensureRemoteSubscription(client);
+      }
       return _cardsController.stream;
     }
 
@@ -812,29 +1508,9 @@ class SavedCardsRepository {
     _watchingScope = scope;
     unawaited(_loadLocalState());
 
-    final client = _clientOrNull;
     if (client != null) {
-      _remoteSubscription ??= client
-          .from('saved_cards')
-          .stream(primaryKey: ['user_id', 'id'])
-          .order('created_at', ascending: false)
-          .listen((rows) {
-            final uid = FirebaseAuth.instance.currentUser?.uid;
-            final userRows = uid != null
-                ? rows.where((row) => row['user_id'] == uid).toList()
-                : <Map<String, dynamic>>[];
-            final mapped = userRows
-                .map((row) => SavedCard.fromMap(row))
-                .toList();
-            final merged = <String, SavedCard>{
-              for (final card in _cards) card.id: card,
-              for (final card in mapped) card.id: card,
-            };
-            _cards
-              ..clear()
-              ..addAll(merged.values.toList());
-            _publishCards();
-          });
+      unawaited(_loadRemoteCardsOnce(client));
+      _ensureRemoteSubscription(client);
     }
 
     _publishCards();

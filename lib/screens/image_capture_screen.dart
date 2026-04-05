@@ -334,7 +334,6 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
               onSave: () async {
                 final saved = await _handleSave(result);
                 if (saved) {
-                  setModalState(() => isSaved = true);
                   Navigator.of(dialogContext).pop();
                   _dialogVisible = false;
                   _navigateToDictionary();
@@ -393,6 +392,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
           result: result,
           imageBytes: _latestCapturedBytes,
         );
+        await XPService.instance.recordLearningActivity(source: 'scan');
 
         if (!mounted) {
           return true;
@@ -415,6 +415,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
         return true;
       }
 
+      await XPService.instance.recordLearningActivity(source: 'scan');
       await XPService.instance.addXP(50);
 
       if (!mounted) {
@@ -422,7 +423,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đã lưu "${result.word}" vào Supabase. +50 XP!'),
+          content: Text('Đã lưu "${result.word}". +50 XP!'),
           behavior: SnackBarBehavior.floating,
         ),
       );

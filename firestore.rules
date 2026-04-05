@@ -9,10 +9,21 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function hasValidOasisSyncShape() {
+      return (
+        !('oasis_collection_achievements' in request.resource.data) ||
+        request.resource.data.oasis_collection_achievements is map
+      ) && (
+        !('magical_oasis_state' in request.resource.data) ||
+        request.resource.data.magical_oasis_state is map
+      );
+    }
+
     match /users/{uid} {
       // Allow signed-in users to look up friend profiles by social_id.
       allow read: if isSignedIn();
-      allow write: if isOwner(uid);
+      // Keep user document owner-only, and allow syncing oasis payloads.
+      allow write: if isOwner(uid) && hasValidOasisSyncShape();
 
       match /learning_state/{stateId} {
         allow read, write: if isOwner(uid);

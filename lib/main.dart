@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -11,6 +13,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/firestore_sync_status.dart';
 import 'services/class_schedule_notification_service.dart';
+import 'services/saved_cards_repository.dart';
+import 'services/vocabulary_service.dart';
 import 'services/xp_service.dart';
 
 Future<void> main() async {
@@ -187,6 +191,8 @@ class _AppBootstrapState extends State<_AppBootstrap> {
   Future<void> _initializeAppState() async {
     await _initializeFirebase();
     await XPService.instance.init();
+    SavedCardsRepository.instance.watchCards();
+    unawaited(VocabularyService.instance.loadHints());
     _preferences = await SharedPreferences.getInstance();
     _shouldShowOnboarding =
         !(_preferences?.getBool(_onboardingSeenKey) ?? false);

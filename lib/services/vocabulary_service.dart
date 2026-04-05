@@ -65,6 +65,7 @@ class VocabularyService {
       ValueNotifier<List<VocabularyHint>>([]);
 
   bool _initialized = false;
+  bool _canWriteHintsRemotely = true;
 
   Future<void> loadHints() async {
     if (_initialized) return;
@@ -104,15 +105,54 @@ class VocabularyService {
     try {
       final client = Supabase.instance.client;
       final normalizedMeaning = meaning.toLowerCase().trim();
+      if (normalizedMeaning.isEmpty) {
+        return null;
+      }
 
-      final row = await client
-          .from('vocabulary_hints')
-          .select('id')
-          .ilike('meaning', normalizedMeaning)
-          .limit(1)
-          .maybeSingle();
+      Future<String?> lookupByPattern(String pattern) async {
+        final row = await client
+            .from('vocabulary_hints')
+            .select('id')
+            .ilike('meaning', pattern)
+            .limit(1)
+            .maybeSingle();
+        return row == null ? null : row['id']?.toString();
+      }
 
-      return row == null ? null : row['id']?.toString();
+      final exactId = await lookupByPattern(normalizedMeaning);
+      if (exactId != null && exactId.isNotEmpty) {
+        return exactId;
+      }
+
+      final compactMeaning = normalizedMeaning.replaceAll(
+        RegExp(r'\s+'),
+        ' ',
+      );
+      if (compactMeaning != normalizedMeaning) {
+        final compactId = await lookupByPattern(compactMeaning);
+        if (compactId != null && compactId.isNotEmpty) {
+          return compactId;
+        }
+      }
+
+      final fuzzyPattern = '%$normalizedMeaning%';
+      final fuzzyId = await lookupByPattern(fuzzyPattern);
+      if (fuzzyId != null && fuzzyId.isNotEmpty) {
+        return fuzzyId;
+      }
+
+      // Some datasets keep Vietnamese labels in hint_vi instead of meaning.
+      try {
+        final row = await client
+            .from('vocabulary_hints')
+            .select('id')
+            .ilike('hint_vi', fuzzyPattern)
+            .limit(1)
+            .maybeSingle();
+        return row == null ? null : row['id']?.toString();
+      } on PostgrestException {
+        return null;
+      }
     } catch (e) {
       debugPrint('Error finding vocabulary by meaning: $e');
       return null;
@@ -131,16 +171,25 @@ class VocabularyService {
       final normalizedMeaning = meaning.trim().toLowerCase();
       if (normalizedMeaning.isEmpty) return null;
 
+      final existingId = await findVocabularyIdByMeaning(normalizedMeaning);
+      if (existingId != null && existingId.isNotEmpty) {
+        return existingId;
+      }
+
+      if (!_canWriteHintsRemotely) {
+        return null;
+      }
+
       final response = await client
           .from('vocabulary_hints')
-          .upsert({
+          .insert({
             'topic': topic,
             'meaning': normalizedMeaning,
             'hint': hint,
             'masked_meaning': maskedMeaning,
             'hint_vi': hintVi,
             'created_at': DateTime.now().toIso8601String(),
-          }, onConflict: 'meaning')
+          })
           .select('id')
           .maybeSingle();
 
@@ -156,6 +205,20 @@ class VocabularyService {
           .maybeSingle();
 
       return fallback == null ? null : fallback['id']?.toString();
+    } on PostgrestException catch (error) {
+      if (error.code == '42501') {
+        // RLS denied: skip future remote writes to avoid repeated runtime spam.
+        _canWriteHintsRemotely = false;
+        return null;
+      }
+
+      if (error.code == '23505') {
+        final existing = await findVocabularyIdByMeaning(meaning);
+        return existing;
+      }
+
+      debugPrint('Error inserting vocabulary hint: $error');
+      return null;
     } catch (e) {
       debugPrint('Error inserting vocabulary hint: $e');
       return null;
@@ -163,6 +226,10 @@ class VocabularyService {
   }
 
   Future<void> addCustomHintIfNeeded(String word, String topic) async {
+    if (!_canWriteHintsRemotely) {
+      return;
+    }
+
     final wordLower = word.toLowerCase().trim();
     final exists = _hints.any(
       (h) => h.meaning.toLowerCase().trim() == wordLower,
@@ -188,6 +255,12 @@ class VocabularyService {
         _hints.add(newHint);
         hintsNotifier.value = List.unmodifiable(_hints);
       }
+    } on PostgrestException catch (error) {
+      if (error.code == '42501') {
+        _canWriteHintsRemotely = false;
+        return;
+      }
+      debugPrint('Error adding custom hint: $error');
     } catch (e) {
       debugPrint('Error adding custom hint: $e');
     }

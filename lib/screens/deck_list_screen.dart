@@ -274,9 +274,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _repository.watchCards();
-    });
+    _repository.watchCards();
     VocabularyService.instance.hintsNotifier.addListener(_onHintsChanged);
     _loadRecentAccessHistory();
     _initSpeech();
@@ -481,7 +479,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
                 ..addAll(remoteLoaded);
             });
           }
-          await _persistRecentAccessHistory();
+          await _persistRecentAccessHistory(syncRemote: false);
           return;
         }
       }
@@ -538,15 +536,11 @@ class _DeckListScreenState extends State<DeckListScreen> {
                     ..addAll(remoteLoaded);
                 });
               }
-              await _persistRecentAccessHistory();
+              await _persistRecentAccessHistory(syncRemote: false);
               return;
             }
           }
         }
-      }
-
-      if (_recentAccessByTopic.isNotEmpty) {
-        await _persistRecentAccessToFirebase();
       }
 
       FirestoreSyncStatus.instance.reportSuccess(
@@ -563,7 +557,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
     }
   }
 
-  Future<void> _persistRecentAccessHistory() async {
+  Future<void> _persistRecentAccessHistory({bool syncRemote = true}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final entries = _recentAccessByTopic.entries
@@ -573,7 +567,9 @@ class _DeckListScreenState extends State<DeckListScreen> {
           )
           .toList();
       await prefs.setStringList(_recentAccessHistoryKey, entries);
-      await _persistRecentAccessToFirebase();
+      if (syncRemote) {
+        await _persistRecentAccessToFirebase();
+      }
     } catch (_) {
       // Ignore persistence errors so opening a deck is never blocked.
     }

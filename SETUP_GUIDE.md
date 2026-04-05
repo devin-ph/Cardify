@@ -15,7 +15,7 @@ HF_ANALYZE_ENDPOINT=https://minh-4t-english-analyze.hf.space/analyze-image
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_BUCKET=btl
-SUPABASE_TABLE=flashcards
+SUPABASE_TABLE=saved_cards
 ```
 
 ## Buoc 3: Cai dat dependencies

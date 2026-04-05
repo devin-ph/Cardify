@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flip_card/flip_card.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -14,6 +15,7 @@ import '../models/saved_card.dart';
 import '../services/firestore_sync_status.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/topic_classifier.dart';
+import '../services/xp_service.dart';
 
 class FlashcardScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -886,19 +888,6 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           return;
         }
 
-        if (cleaned.isNotEmpty) {
-          if (currentUser != null) {
-            FirestoreSyncStatus.instance.reportWriting(
-              path: 'users/${currentUser.uid}/postponed_words/$normalizedTopic',
-              reason: 'ghi postponed words từ local cache',
-            );
-          }
-          await docRef.set({
-            'topic': normalizedTopic,
-            'words': cleaned,
-            'updated_at': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
         if (currentUser == null) {
           return;
         }
@@ -1140,6 +1129,15 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         : 0;
     final currentTopic = widget.selectedTopic ?? deckNames[selectedDeck];
 
+    if (practiced) {
+      unawaited(
+        XPService.instance.recordLearningActivity(
+          occurredAt: _practiceStartedAt,
+          source: 'flashcard',
+        ),
+      );
+    }
+
     Navigator.of(context).pop({
       'practiced': practiced,
       'practiceDurationSeconds': durationSeconds < 0 ? 0 : durationSeconds,
@@ -1311,6 +1309,13 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           ? 0
           : DateTime.now().difference(_practiceStartedAt!).inSeconds;
       final currentTopic = widget.selectedTopic ?? deckNames[selectedDeck];
+
+      unawaited(
+        XPService.instance.recordLearningActivity(
+          occurredAt: _practiceStartedAt,
+          source: 'flashcard',
+        ),
+      );
 
       Navigator.of(context).pop({
         'practiced': true,

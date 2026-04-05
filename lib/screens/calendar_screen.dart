@@ -14,6 +14,7 @@ import '../services/class_schedule_notification_service.dart';
 import '../services/firestore_sync_status.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/topic_classifier.dart';
+import '../services/xp_service.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -56,6 +57,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   late List<int> _studiedDays;
   late int _currentStreak;
   late List<String> _availableDecks;
+  Set<String> _completedLearningDayKeys = <String>{};
   Map<String, List<String>> _scheduledDecksByDay = <String, List<String>>{};
   Map<String, String> _scheduledTimeByDay = <String, String>{};
   Map<String, int> _scheduledStyleByDay = <String, int>{};
@@ -67,12 +69,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void initState() {
     super.initState();
     _studiedDays = <int>[];
-    _currentStreak = 0;
+    _currentStreak = XPService.instance.streakNotifier.value;
+    _completedLearningDayKeys = Set<String>.from(
+      XPService.instance.learningDayKeysNotifier.value,
+    );
     _availableDecks = <String>[];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _repository.watchCards();
     });
     _repository.cardsNotifier.addListener(_onCardsChanged);
+    XPService.instance.streakNotifier.addListener(_onStreakChanged);
+    XPService.instance.learningDayKeysNotifier.addListener(
+      _onLearningDaysChanged,
+    );
     _onCardsChanged();
     _loadAppStartDate();
     _loadSchedules();
@@ -84,6 +93,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _countdownTicker?.cancel();
     _underFifteenMessageEntry?.remove();
     _repository.cardsNotifier.removeListener(_onCardsChanged);
+    XPService.instance.streakNotifier.removeListener(_onStreakChanged);
+    XPService.instance.learningDayKeysNotifier.removeListener(
+      _onLearningDaysChanged,
+    );
     super.dispose();
   }
 
@@ -580,6 +593,54 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
+  bool _sameDayKeySet(Set<String> left, Set<String> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    for (final key in left) {
+      if (!right.contains(key)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _onStreakChanged() {
+    final nextStreak = XPService.instance.streakNotifier.value;
+    if (nextStreak == _currentStreak) {
+      return;
+    }
+
+    if (!mounted) {
+      _currentStreak = nextStreak;
+      return;
+    }
+
+    setState(() {
+      _currentStreak = nextStreak;
+    });
+  }
+
+  void _onLearningDaysChanged() {
+    final nextKeys = Set<String>.from(
+      XPService.instance.learningDayKeysNotifier.value,
+    );
+    if (_sameDayKeySet(_completedLearningDayKeys, nextKeys)) {
+      return;
+    }
+
+    if (!mounted) {
+      _completedLearningDayKeys = nextKeys;
+      _refreshCalendarStats();
+      return;
+    }
+
+    setState(() {
+      _completedLearningDayKeys = nextKeys;
+      _refreshCalendarStats();
+    });
+  }
+
   Future<void> _loadSchedules() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -852,11 +913,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   bool _hasLearningActivityOnDate(DateTime date) {
-    final target = DateUtils.dateOnly(date);
-    return _repository.cardsNotifier.value.any((card) {
-      final savedDate = DateUtils.dateOnly(card.savedAt.toLocal());
-      return DateUtils.isSameDay(savedDate, target);
-    });
+    final targetKey = _dateKey(date);
+    return _completedLearningDayKeys.contains(targetKey);
   }
 
   List<String> _decksForDate(DateTime date) {
@@ -875,18 +933,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final date = DateTime(_focusedDay.year, _focusedDay.month, day);
       return !_isBeforeAppStart(date) && _hasLearningActivityOnDate(date);
     }).toList();
-    _currentStreak = _calculateCurrentStreak();
-    _persistStreakToProfile();
-  }
-
-  int _calculateCurrentStreak() {
-    int streak = 0;
-    var cursor = DateUtils.dateOnly(DateTime.now());
-    while (!_isBeforeAppStart(cursor) && _hasLearningActivityOnDate(cursor)) {
-      streak++;
-      cursor = cursor.subtract(const Duration(days: 1));
-    }
-    return streak;
+    _currentStreak = XPService.instance.streakNotifier.value;
   }
 
   List<DateTime> _recentLearningDays({int limit = 7}) {
@@ -1798,18 +1845,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             final isToday =
                                 isValidDay &&
                                 DateUtils.isSameDay(dayDate, today);
-                            final studiedToday =
-                                isToday && _hasLearningActivityOnDate(dayDate);
-                            final isCompleted = scheduled || studiedToday;
+                            final learnedOnDay =
+                                isValidDay &&
+                                _hasLearningActivityOnDate(dayDate);
+                            final isCompleted = learnedOnDay;
                             final isPast =
                                 isValidDay && dayDate.isBefore(today);
                             final isFuture =
                                 isValidDay && dayDate.isAfter(today);
-                            final fillColor = isFuture && scheduled
+                            final hasUpcomingSchedule =
+                                (isFuture || isToday) &&
+                                scheduled &&
+                                !isCompleted;
+                            final fillColor = hasUpcomingSchedule
                                 ? const Color(
                                     0xFFFFF3C4,
                                   ).withValues(alpha: 0.65)
-                                : (isPast || isToday) && isCompleted
+                                : isCompleted
                                 ? const Color(
                                     0xFFE9F8F1,
                                   ).withValues(alpha: 0.72)
@@ -1820,9 +1872,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 : const Color(
                                     0xFFF7FAFC,
                                   ).withValues(alpha: 0.55);
-                            final borderColor = isFuture && scheduled
+                            final borderColor = hasUpcomingSchedule
                                 ? const Color(0xFFE1B100).withValues(alpha: 0.7)
-                                : (isPast || isToday) && isCompleted
+                                : isCompleted
                                 ? const Color(
                                     0xFF8FDDBD,
                                   ).withValues(alpha: 0.85)
@@ -1831,16 +1883,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 : const Color(
                                     0xFFE4EAF1,
                                   ).withValues(alpha: 0.8);
-                            final icon = isFuture && scheduled
+                            final icon = hasUpcomingSchedule
                                 ? Icons.local_offer_rounded
-                                : (isPast || isToday) && isCompleted
+                                : isCompleted
                                 ? Icons.check_circle
                                 : isPast && !beforeAppStart
                                 ? Icons.remove_circle_outline
                                 : Icons.circle_outlined;
-                            final iconColor = isFuture && scheduled
+                            final iconColor = hasUpcomingSchedule
                                 ? const Color(0xFFE1B100)
-                                : (isPast || isToday) && isCompleted
+                                : isCompleted
                                 ? const Color(0xFF2CB67D)
                                 : isPast && !beforeAppStart
                                 ? const Color(0xFFE45757)
