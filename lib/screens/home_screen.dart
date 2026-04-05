@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/saved_card.dart';
 import '../services/saved_cards_repository.dart';
+import '../services/vocabulary_service.dart';
 import '../services/xp_service.dart';
 import '../services/topic_classifier.dart';
 import 'flashcard_category_screen.dart';
@@ -100,6 +101,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    VocabularyService.instance.loadHints();
     _bannerController = PageController(viewportFraction: 1);
     _pulseController = AnimationController(
       vsync: this,

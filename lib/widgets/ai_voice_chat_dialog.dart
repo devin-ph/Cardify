@@ -9,6 +9,8 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../services/firestore_sync_status.dart';
 import '../services/voice_chat_service.dart';
+import '../services/saved_cards_repository.dart';
+import '../services/vocabulary_service.dart';
 
 enum _VoiceMode { idle, listening, thinking, speaking }
 
@@ -345,10 +347,25 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
         .map((item) => {'role': item.role, 'content': item.text})
         .toList();
 
+    await VocabularyService.instance.loadHints();
+    final learnedWords = SavedCardsRepository.instance.cards
+        .map((card) => card.word.trim().toLowerCase())
+        .where((word) => word.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    final unscannedWords = VocabularyService.instance
+        .getUnscannedHints(learnedWords.toSet())
+        .map((hint) => hint.meaning.trim().toLowerCase())
+        .where((word) => word.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
     try {
       final reply = await _chatService.askAI(
         message: message,
         history: history,
+        learnedWords: learnedWords,
+        unscannedWords: unscannedWords,
       );
       if (!mounted) {
         return;

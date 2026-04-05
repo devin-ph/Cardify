@@ -12,6 +12,7 @@ import '../models/saved_card.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/firestore_sync_status.dart';
 import '../services/topic_classifier.dart';
+import '../services/vocabulary_service.dart';
 
 class DeckListScreen extends StatefulWidget {
   const DeckListScreen({super.key});
@@ -44,6 +45,42 @@ class _DeckListScreenState extends State<DeckListScreen> {
   int filterIndex = 0; // 0: All, 1: Recent, 2: Favorites
   bool _speechReady = false;
   bool _isListening = false;
+
+  Map<String, int> _normalizeTopicCounts(Map<String, int> raw) {
+    final normalized = <String, int>{};
+    for (final entry in raw.entries) {
+      final topic = TopicClassifier.normalizeTopic(entry.key);
+      if (topic.trim().isEmpty) {
+        continue;
+      }
+      normalized[topic] = (normalized[topic] ?? 0) + entry.value;
+    }
+    return normalized;
+  }
+
+  Map<String, int> _mergeTopicCounts(
+    Map<String, int> base,
+    Map<String, int> overlay,
+  ) {
+    final merged = <String, int>{...base};
+    for (final entry in overlay.entries) {
+      final current = merged[entry.key] ?? 0;
+      merged[entry.key] = entry.value > current ? entry.value : current;
+    }
+    return merged;
+  }
+
+  void _onHintsChanged() {
+    final liveCounts = _normalizeTopicCounts(
+      VocabularyService.instance.getTopicCounts(),
+    );
+    if (!mounted || liveCounts.isEmpty) {
+      return;
+    }
+    setState(() {
+      _hintsCountCache = _mergeTopicCounts(_hintsCountCache, liveCounts);
+    });
+  }
 
   final List<Map<String, dynamic>> decks = [
     {
@@ -159,6 +196,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
   void initState() {
     super.initState();
     _repository.watchCards();
+    VocabularyService.instance.hintsNotifier.addListener(_onHintsChanged);
     _loadRecentAccessHistory();
     _initSpeech();
     _loadHintCounts();
@@ -218,29 +256,50 @@ class _DeckListScreenState extends State<DeckListScreen> {
   }
 
   Future<void> _loadHintCounts() async {
+    final localCounts = _normalizeTopicCounts(await _loadHintCountsFromAsset());
+    Map<String, int> remoteCounts = <String, int>{};
+    try {
+      await VocabularyService.instance.loadHints();
+      remoteCounts = _normalizeTopicCounts(
+        VocabularyService.instance.getTopicCounts(),
+      );
+    } catch (_) {
+      // Ignore and use local fallback.
+    }
+
+    if (mounted) {
+      setState(() {
+        _hintsCountCache = _mergeTopicCounts(localCounts, remoteCounts);
+      });
+    }
+  }
+
+  Future<Map<String, int>> _loadHintCountsFromAsset() async {
     try {
       final raw = await rootBundle.loadString(
         'assets/data/vocabulary_hints_vi.json',
       );
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return;
+      if (decoded is! List) {
+        return <String, int>{};
+      }
 
       final counts = <String, int>{};
       for (final item in decoded) {
-        if (item is! Map) continue;
-        final meaning = item['meaning']?.toString() ?? '';
-        final topicOverride = item['topic']?.toString();
-        final actualTopic =
-            topicOverride ?? TopicClassifier.classifyWord(meaning, '');
-        counts[actualTopic] = (counts[actualTopic] ?? 0) + 1;
+        if (item is! Map) {
+          continue;
+        }
+        final rawTopic = item['topic']?.toString() ?? '';
+        final normalizedTopic = TopicClassifier.normalizeTopic(rawTopic);
+        if (normalizedTopic.trim().isEmpty) {
+          continue;
+        }
+        counts[normalizedTopic] = (counts[normalizedTopic] ?? 0) + 1;
       }
-
-      if (mounted) {
-        setState(() {
-          _hintsCountCache = counts;
-        });
-      }
-    } catch (_) {}
+      return counts;
+    } catch (_) {
+      return <String, int>{};
+    }
   }
 
   Future<void> _loadRecentAccessHistory() async {
@@ -355,10 +414,15 @@ class _DeckListScreenState extends State<DeckListScreen> {
               .get();
           final legacyRaw = legacySnap.data()?['recent_access_by_topic'];
           if (legacyRaw is Map) {
-            final remoteLoaded = <
-              String,
-              ({int lastAccessAt, bool practiced, int practiceDurationSeconds})
-            >{};
+            final remoteLoaded =
+                <
+                  String,
+                  ({
+                    int lastAccessAt,
+                    bool practiced,
+                    int practiceDurationSeconds,
+                  })
+                >{};
             for (final entry in legacyRaw.entries) {
               final topic = entry.key.toString().trim();
               if (topic.isEmpty || entry.value is! Map) {
@@ -556,6 +620,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
 
   @override
   void dispose() {
+    VocabularyService.instance.hintsNotifier.removeListener(_onHintsChanged);
     _speech.stop();
     _searchController.dispose();
     super.dispose();
@@ -566,9 +631,21 @@ class _DeckListScreenState extends State<DeckListScreen> {
     List<SavedCard> cards,
   ) {
     final imageAdded = _repository.imageCountForTopic(topic);
-    final totalInDataset =
-        _hintsCountCache[topic] ?? _defaultTotalCardsPerTopic;
-    final total = totalInDataset;
+    final topicKey = TopicClassifier.normalizeTopic(topic);
+    final totalInDataset = _hintsCountCache[topicKey] ?? 0;
+    final savedUniqueCount = cards
+        .where((card) => TopicClassifier.normalizeTopic(card.topic) == topicKey)
+        .map((card) => card.word.trim().toLowerCase())
+        .where((word) => word.isNotEmpty)
+        .toSet()
+        .length;
+    final total = totalInDataset > 0
+        ? (savedUniqueCount > totalInDataset
+              ? savedUniqueCount
+              : totalInDataset)
+        : (savedUniqueCount > 0
+              ? savedUniqueCount
+              : _defaultTotalCardsPerTopic);
     final progress = total == 0 ? 0.0 : (imageAdded / total).clamp(0.0, 1.0);
     return (imageAdded: imageAdded, total: total, progress: progress);
   }
@@ -582,31 +659,36 @@ class _DeckListScreenState extends State<DeckListScreen> {
           valueListenable: _repository.cardsNotifier,
           builder: (context, cards, _) {
             final normalizedSearch = _normalizeText(search);
-            final filteredDecks = decks.where((deck) {
-              final title = deck['title'] as String;
-              if (filterIndex == 1 && !_recentAccessByTopic.containsKey(title)) {
-                return false;
-              }
-              if (filterIndex == 2 && !(deck['favorite'] as bool)) {
-                return false;
-              }
-              if (filterIndex != 1 &&
-                  normalizedSearch.isNotEmpty &&
-                  !_matchesDeckByVocabulary(deck, normalizedSearch, cards)) {
-                return false;
-              }
-              return true;
-            }).toList()
-              ..sort((a, b) {
-                if (filterIndex != 1) {
-                  return 0;
-                }
-                final titleA = a['title'] as String;
-                final titleB = b['title'] as String;
-                final timeA = _recentAccessByTopic[titleA]?.lastAccessAt ?? 0;
-                final timeB = _recentAccessByTopic[titleB]?.lastAccessAt ?? 0;
-                return timeB.compareTo(timeA);
-              });
+            final filteredDecks =
+                decks.where((deck) {
+                  final title = deck['title'] as String;
+                  if (filterIndex == 1 &&
+                      !_recentAccessByTopic.containsKey(title)) {
+                    return false;
+                  }
+                  if (filterIndex == 2 && !(deck['favorite'] as bool)) {
+                    return false;
+                  }
+                  if (filterIndex != 1 &&
+                      normalizedSearch.isNotEmpty &&
+                      !_matchesDeckByVocabulary(
+                        deck,
+                        normalizedSearch,
+                        cards,
+                      )) {
+                    return false;
+                  }
+                  return true;
+                }).toList()..sort((a, b) {
+                  if (filterIndex != 1) {
+                    return 0;
+                  }
+                  final titleA = a['title'] as String;
+                  final titleB = b['title'] as String;
+                  final timeA = _recentAccessByTopic[titleA]?.lastAccessAt ?? 0;
+                  final timeB = _recentAccessByTopic[titleB]?.lastAccessAt ?? 0;
+                  return timeB.compareTo(timeA);
+                });
 
             return Stack(
               children: [
@@ -652,7 +734,9 @@ class _DeckListScreenState extends State<DeckListScreen> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF7EA7C9).withValues(alpha: 0.14),
+                                color: const Color(
+                                  0xFF7EA7C9,
+                                ).withValues(alpha: 0.14),
                                 blurRadius: 18,
                                 offset: const Offset(0, 8),
                               ),
@@ -713,8 +797,9 @@ class _DeckListScreenState extends State<DeckListScreen> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEAF3FE)
-                                      .withValues(alpha: 0.85),
+                                  color: const Color(
+                                    0xFFEAF3FE,
+                                  ).withValues(alpha: 0.85),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: const Text(
@@ -738,7 +823,9 @@ class _DeckListScreenState extends State<DeckListScreen> {
                               gradient: LinearGradient(
                                 colors: [
                                   Colors.white.withValues(alpha: 0.90),
-                                  const Color(0xFFF6FAFF).withValues(alpha: 0.78),
+                                  const Color(
+                                    0xFFF6FAFF,
+                                  ).withValues(alpha: 0.78),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -749,8 +836,9 @@ class _DeckListScreenState extends State<DeckListScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF7EA7C9)
-                                      .withValues(alpha: 0.10),
+                                  color: const Color(
+                                    0xFF7EA7C9,
+                                  ).withValues(alpha: 0.10),
                                   blurRadius: 12,
                                   offset: const Offset(0, 6),
                                 ),
@@ -868,19 +956,19 @@ class _DeckListScreenState extends State<DeckListScreen> {
                             return _buildDeckCard(
                               deck,
                               cards,
-                              recentMeta: _recentAccessByTopic[
-                                deck['title'] as String
-                              ],
+                              recentMeta:
+                                  _recentAccessByTopic[deck['title'] as String],
                               showRecentMeta: filterIndex == 1,
                               onTap: () async {
-                                final selectedTopicKey = deck['title'] as String;
+                                final selectedTopicKey =
+                                    deck['title'] as String;
                                 final selectedTopicForFlashcard =
                                     TopicClassifier.getVietnameseTopic(
                                       selectedTopicKey,
                                     );
                                 final isViewingRecentHistory = filterIndex == 1;
-                                final accessedAt = DateTime.now()
-                                    .millisecondsSinceEpoch;
+                                final accessedAt =
+                                    DateTime.now().millisecondsSinceEpoch;
                                 final result = await Navigator.push<dynamic>(
                                   context,
                                   MaterialPageRoute(
@@ -903,7 +991,8 @@ class _DeckListScreenState extends State<DeckListScreen> {
                                   if (rawDuration is int) {
                                     practiceDurationSeconds = rawDuration;
                                   } else if (rawDuration is num) {
-                                    practiceDurationSeconds = rawDuration.toInt();
+                                    practiceDurationSeconds = rawDuration
+                                        .toInt();
                                   }
                                 }
 
@@ -1100,7 +1189,8 @@ class _DeckListScreenState extends State<DeckListScreen> {
                                         color: Color(0xFF6A7486),
                                       ),
                                     ),
-                                    if (showRecentMeta && recentMeta != null) ...[
+                                    if (showRecentMeta &&
+                                        recentMeta != null) ...[
                                       const SizedBox(height: 6),
                                       Text(
                                         'Truy cập: ${_formatRecentAccessTime(recentMeta.lastAccessAt)}',
@@ -1235,10 +1325,7 @@ class _DeckAmbientBlob extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
