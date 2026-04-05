@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cardify_ai_english_learning_app/screens/deck_list_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -61,7 +60,6 @@ class _MainScreenState extends State<MainScreen> {
   late final Widget _calendarTab;
   late final Widget _dictionaryTab;
   late final Widget _deckListTab;
-  late final Widget _achievementsTab;
   Timer? _dueStudyCheckTimer;
   bool _isDueStudyDialogVisible = false;
   bool _isLaunchingDueDeck = false;
@@ -82,7 +80,6 @@ class _MainScreenState extends State<MainScreen> {
       onSearchModeChanged: _onDictionarySearchModeChanged,
     );
     _deckListTab = DeckListScreen();
-    _achievementsTab = const AchievementsScreen();
 
     _authSubscription = firebase_auth.FirebaseAuth.instance
         .authStateChanges()
@@ -152,6 +149,8 @@ class _MainScreenState extends State<MainScreen> {
               return;
             }
 
+            final nextStreak = (data['streak'] as num?)?.toInt() ?? _streak;
+
             setState(() {
               _userName =
                   data['display_name']?.toString().trim().isNotEmpty == true
@@ -161,16 +160,14 @@ class _MainScreenState extends State<MainScreen> {
                   ? data['email'].toString().trim()
                   : (user.email ?? _userEmail);
               _socialId = data['social_id']?.toString().trim() ?? '';
-              _streak = (data['streak'] as num?)?.toInt() ?? _streak;
+              _streak = nextStreak;
               _experience = (data['xp'] as num?)?.toInt() ?? _experience;
               _level = (data['level'] as num?)?.toInt() ?? _level;
               _nextLevelExperience =
                   (data['next_level_xp'] as num?)?.toInt() ??
                   _nextLevelExperience;
 
-              final remoteAvatarBase64 = data['avatar_base64']
-                  ?.toString()
-                  .trim();
+              final remoteAvatarBase64 = data['avatar_base64']?.toString().trim();
               if (remoteAvatarBase64 != null && remoteAvatarBase64.isNotEmpty) {
                 try {
                   _userAvatarBytes = base64Decode(remoteAvatarBase64);
@@ -303,7 +300,7 @@ class _MainScreenState extends State<MainScreen> {
         return;
       }
       setState(() {
-        _socialId = assigned ?? _socialId;
+        _socialId = assigned;
       });
     } catch (error) {
       FirestoreSyncStatus.instance.reportError(
@@ -1360,6 +1357,9 @@ class _MainScreenState extends State<MainScreen> {
                     pronunciationGuide: candidate.pronunciationGuide,
                   );
                   await _cardsRepository.saveResult(analysis, null);
+                  await XPService.instance.recordLearningActivity(
+                    source: 'chat',
+                  );
                   await XPService.instance.addXP(35);
                   savedWords.add(candidate.word);
 
@@ -1502,7 +1502,7 @@ class _MainScreenState extends State<MainScreen> {
         _calendarTab,
         _dictionaryTab,
         _deckListTab,
-        _achievementsTab,
+        AchievementsScreen(isActive: _currentIndex == 4),
       ],
     );
   }

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
-import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
@@ -13,7 +12,9 @@ import '../services/saved_cards_repository.dart';
 import '../services/xp_service.dart';
 
 class AchievementsScreen extends StatefulWidget {
-  const AchievementsScreen({super.key});
+  final bool isActive;
+
+  const AchievementsScreen({super.key, this.isActive = false});
 
   @override
   State<AchievementsScreen> createState() => _AchievementsScreenState();
@@ -565,7 +566,36 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     };
   }
 
+  int _fallbackStatValue(dynamic localValue, dynamic remoteValue) {
+    final local = localValue is num ? localValue.toInt() : 0;
+    if (local > 0) {
+      return local;
+    }
+    final remote = remoteValue is num ? remoteValue.toInt() : 0;
+    return remote;
+  }
+
+  Map<String, dynamic> _remoteStatsFromSnapshot(
+    Map<String, dynamic>? data,
+  ) {
+    final oasisState = data?['magical_oasis_state'];
+    if (oasisState is! Map) {
+      return <String, dynamic>{};
+    }
+
+    final stats = oasisState['stats'];
+    if (stats is! Map) {
+      return <String, dynamic>{};
+    }
+
+    return Map<String, dynamic>.from(stats.cast<String, dynamic>());
+  }
+
   void _scheduleOasisSync({bool immediate = false}) {
+    if (!widget.isActive) {
+      return;
+    }
+
     _oasisSyncDebounce?.cancel();
     if (immediate) {
       unawaited(_syncOasisDataToFirebase());
@@ -578,6 +608,10 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   }
 
   Future<void> _syncOasisDataToFirebase() async {
+    if (!widget.isActive) {
+      return;
+    }
+
     if (_isSyncingOasis) {
       return;
     }
@@ -587,11 +621,95 @@ class _AchievementsScreenState extends State<AchievementsScreen>
       return;
     }
 
+    Map<String, dynamic> remoteData = <String, dynamic>{};
+    try {
+      final snapshot = await docRef.get();
+      remoteData = snapshot.data() ?? <String, dynamic>{};
+    } catch (_) {
+      remoteData = <String, dynamic>{};
+    }
+
+    final remoteStats = _remoteStatsFromSnapshot(remoteData);
+    final remoteCollection = remoteData['oasis_collection_achievements'];
+    final remoteOasis = remoteData['magical_oasis_state'];
+
+    final remoteCollectionUnlockedCount = remoteCollection is Map
+        ? (remoteCollection['unlocked_count'] as num?)?.toInt() ?? 0
+        : 0;
+
+    final localCardsStudied = _userTotalCardsStudied;
+    final localScans = _userTotalScans;
+    final localStreak = _currentStreak;
+    final localXp = _userTotalXp;
+
+    if (remoteCollectionUnlockedCount > 0 &&
+        localCardsStudied == 0 &&
+        localScans == 0 &&
+        localStreak == 0 &&
+        localXp == 0) {
+      final remoteStatsCards = remoteStats['cards_studied'] is num
+          ? (remoteStats['cards_studied'] as num).toInt()
+          : 0;
+      final remoteStatsScans = remoteStats['total_scans'] is num
+          ? (remoteStats['total_scans'] as num).toInt()
+          : 0;
+      final remoteStatsStreak = remoteStats['streak'] is num
+          ? (remoteStats['streak'] as num).toInt()
+          : 0;
+      final remoteStatsXp = remoteStats['total_xp'] is num
+          ? (remoteStats['total_xp'] as num).toInt()
+          : 0;
+      if (remoteStatsCards > 0 ||
+          remoteStatsScans > 0 ||
+          remoteStatsStreak > 0 ||
+          remoteStatsXp > 0 ||
+          remoteOasis is Map) {
+        return;
+      }
+    }
+
     final collectionPayload = _buildOasisCollectionAchievementsPayload();
     final oasisPayload = _buildMagicalOasisStatePayload();
+    final mergedCollectionPayload = <String, dynamic>{
+      ...collectionPayload,
+      if (remoteCollection is Map &&
+          collectionPayload['unlocked_count'] == 0 &&
+          (remoteCollection['unlocked_count'] as num?)?.toInt() != null &&
+          (remoteCollection['unlocked_count'] as num?)!.toInt() > 0)
+        ...Map<String, dynamic>.from(remoteCollection.cast<String, dynamic>()),
+    };
+    final mergedStats = <String, dynamic>{
+      'streak': _fallbackStatValue(
+        _currentStreak,
+        remoteStats['streak'],
+      ),
+      'total_scans': _fallbackStatValue(
+        _userTotalScans,
+        remoteStats['total_scans'],
+      ),
+      'cards_studied': _fallbackStatValue(
+        _userTotalCardsStudied,
+        remoteStats['cards_studied'],
+      ),
+      'total_xp': _fallbackStatValue(
+        _userTotalXp,
+        remoteStats['total_xp'],
+      ),
+      'current_league': (_userTotalXp > 0)
+          ? _currentLeague['name']
+          : (remoteStats['current_league']?.toString() ?? _currentLeague['name']),
+    };
+    final mergedOasisPayload = <String, dynamic>{
+      ...oasisPayload,
+      'stats': mergedStats,
+      if (remoteOasis is Map &&
+          oasisPayload['is_barren'] == true &&
+          remoteOasis['is_barren'] == false)
+        ...Map<String, dynamic>.from(remoteOasis.cast<String, dynamic>()),
+    };
     final syncDigest = jsonEncode(<String, dynamic>{
-      'collection': collectionPayload,
-      'oasis': oasisPayload,
+      'collection': mergedCollectionPayload,
+      'oasis': mergedOasisPayload,
     });
 
     if (syncDigest == _lastOasisSyncDigest) {
@@ -605,8 +723,8 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         reason: 'đồng bộ tiến độ bộ sưu tập và ốc đảo kỳ diệu',
       );
       await docRef.set({
-        'oasis_collection_achievements': collectionPayload,
-        'magical_oasis_state': oasisPayload,
+        'oasis_collection_achievements': mergedCollectionPayload,
+        'magical_oasis_state': mergedOasisPayload,
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       _lastOasisSyncDigest = syncDigest;
@@ -626,7 +744,24 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   }
 
   void _onOasisProgressSourcesChanged() {
+    if (!widget.isActive) {
+      return;
+    }
     _scheduleOasisSync();
+  }
+
+  @override
+  void didUpdateWidget(covariant AchievementsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!oldWidget.isActive && widget.isActive) {
+      _scheduleOasisSync();
+      return;
+    }
+
+    if (oldWidget.isActive && !widget.isActive) {
+      _oasisSyncDebounce?.cancel();
+    }
   }
 
   @override
@@ -651,9 +786,6 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     );
     XPService.instance.xpNotifier.addListener(_onLeaderboardProgressChanged);
     _bindLeaderboardStream();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleOasisSync(immediate: true);
-    });
   }
 
   @override
