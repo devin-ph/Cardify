@@ -523,19 +523,30 @@ class _JourneyHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text('BẮT ĐẦU HÀNH TRÌNH', style: _AuthStyles.kicker),
-        SizedBox(height: 8),
-        Text('Chào mừng đến\nCardify', style: _AuthStyles.registerTitle),
-
-        SizedBox(height: 10),
-        Text(
-          'Học ngôn ngữ theo cách của riêng bạn',
-          style: _AuthStyles.subtitle,
-        ),
-      ],
+    return const SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'BẮT ĐẦU HÀNH TRÌNH',
+            style: _AuthStyles.kicker,
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Chào mừng đến Cardify',
+            style: _AuthStyles.registerTitle,
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Học ngôn ngữ theo cách của riêng bạn',
+            style: _AuthStyles.subtitle,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

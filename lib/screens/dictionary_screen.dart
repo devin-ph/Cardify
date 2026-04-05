@@ -608,10 +608,14 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFFE9F4FF),
-              Color(0xFFDFF0FF),
-              Color(0xFFF4EBFF),
+              Color.fromARGB(255, 226, 205, 245),
+              Color(0xFFE2F3FF),
+              Color(0xFFFFF4FA),
+              Color(0xFFE4FAEF),
+              Color(0xFFF3E5FF),
+
             ],
+            stops: [0.0, 0.3, 0.6,0.8, 1.0],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -625,6 +629,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 child: _AmbientBlob(
                   size: 180,
                   color: const Color(0xFF38BDF8).withValues(alpha: 0.16),
+                  blurSigma: 18,
                 ),
               ),
               Positioned(
@@ -633,6 +638,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 child: _AmbientBlob(
                   size: 220,
                   color: const Color(0xFFF472B6).withValues(alpha: 0.12),
+                  blurSigma: 20,
                 ),
               ),
               ValueListenableBuilder<List<SavedCard>>(
@@ -679,8 +685,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.white.withValues(alpha: 0.78),
-                                  const Color(0xFFF7FBFF).withValues(alpha: 0.65),
+                                  const Color.fromARGB(255, 210, 203, 245).withValues(alpha: 0.78),
+                                  const Color.fromARGB(255, 203, 223, 244).withValues(alpha: 0.65),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -732,8 +738,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                           decoration: BoxDecoration(
                                             gradient: const LinearGradient(
                                               colors: [
-                                                Color(0xFF8AD4FF),
-                                                Color(0xFFB68CFF),
+                                                Color.fromARGB(255, 199, 221, 234),
+                                                Color.fromARGB(255, 212, 198, 237),
                                               ],
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
@@ -777,14 +783,6 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                 ),
                               ),
                               const Spacer(),
-                              Text(
-                                '${recentCards.length}/5',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF627485),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -812,117 +810,170 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                     final card = recentCards[index];
                                     return GestureDetector(
                                       onTap: () => _openCardDetails(card),
-                                      child: Container(
+                                      child: SizedBox(
                                         width: 142,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.78),
+                                        child: _GlassCard(
                                           borderRadius: BorderRadius.circular(22),
-                                          border: Border.all(
-                                            color: Colors.white.withValues(alpha: 0.9),
-                                          ),
-                                          boxShadow: [
+                                          boxShadows: [
                                             BoxShadow(
-                                              color: const Color(0xFF7EA7C9).withValues(alpha: 0.12),
-                                              blurRadius: 14,
-                                              offset: const Offset(0, 7),
+                                              color: const Color(
+                                                0xFF7EA7C9,
+                                              ).withValues(alpha: 0.20),
+                                              blurRadius: 20,
+                                              offset: const Offset(0, 10),
+                                            ),
+                                            BoxShadow(
+                                              color: const Color(
+                                                0xFF1D3557,
+                                              ).withValues(alpha: 0.06),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
                                             ),
                                           ],
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                                          children: [
-                                            Expanded(
-                                              child: ClipRRect(
-                                                borderRadius: const BorderRadius.vertical(
-                                                  top: Radius.circular(22),
-                                                ),
-                                                child: Stack(
-                                                  fit: StackFit.expand,
-                                                  children: [
-                                                    card.imageUrl != null
-                                                        ? Image.network(
-                                                            card.imageUrl!,
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder: (_, _, _) => Container(
-                                                              color: const Color(0xFFEAF3FE),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Expanded(
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      const BorderRadius.vertical(
+                                                        top: Radius.circular(22),
+                                                      ),
+                                                  child: Stack(
+                                                    fit: StackFit.expand,
+                                                    children: [
+                                                      card.imageUrl != null
+                                                          ? Image.network(
+                                                              card.imageUrl!,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder:
+                                                                  (_, _, _) =>
+                                                                      Container(
+                                                                        color: const Color(
+                                                                          0xFFEAF3FE,
+                                                                        ),
+                                                                        child:
+                                                                            const Icon(
+                                                                              Icons.broken_image,
+                                                                              color: Colors.blueGrey,
+                                                                            ),
+                                                                      ),
+                                                            )
+                                                          : card.imageBytes !=
+                                                                null
+                                                          ? Image.memory(
+                                                              card.imageBytes!,
+                                                              fit: BoxFit.cover,
+                                                            )
+                                                          : Container(
+                                                              color: const Color(
+                                                                0xFFEAF3FE,
+                                                              ),
                                                               child: const Icon(
-                                                                Icons.broken_image,
-                                                                color: Colors.blueGrey,
+                                                                Icons
+                                                                    .image_outlined,
+                                                                color:
+                                                                    Colors.blueGrey,
+                                                                size: 34,
                                                               ),
                                                             ),
-                                                          )
-                                                        : card.imageBytes != null
-                                                            ? Image.memory(
-                                                                card.imageBytes!,
-                                                                fit: BoxFit.cover,
-                                                              )
-                                                            : Container(
-                                                                color: const Color(0xFFEAF3FE),
-                                                                child: const Icon(
-                                                                  Icons.image_outlined,
-                                                                  color: Colors.blueGrey,
-                                                                  size: 34,
+                                                      Align(
+                                                        alignment:
+                                                            Alignment.topLeft,
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                10,
+                                                              ),
+                                                          child: Container(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal: 8,
+                                                                  vertical: 4,
                                                                 ),
-                                                              ),
-                                                    Align(
-                                                      alignment: Alignment.topLeft,
-                                                      child: Padding(
-                                                        padding: const EdgeInsets.all(10),
-                                                        child: Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 4,
-                                                          ),
-                                                          decoration: BoxDecoration(
-                                                            color: Colors.white.withValues(alpha: 0.88),
-                                                            borderRadius: BorderRadius.circular(999),
-                                                          ),
-                                                          child: Text(
-                                                            card.topic,
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: const TextStyle(
-                                                              fontSize: 10,
-                                                              fontWeight: FontWeight.w700,
-                                                              color: Color(0xFF1D3557),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                                  color: Colors
+                                                                      .white
+                                                                      .withValues(
+                                                                        alpha:
+                                                                            0.68,
+                                                                      ),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        999,
+                                                                      ),
+                                                                ),
+                                                            child: Text(
+                                                              card.topic,
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style:
+                                                                  const TextStyle(
+                                                                    fontSize:
+                                                                        10,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                    color: Color(
+                                                                      0xFF1D3557,
+                                                                    ),
+                                                                  ),
                                                             ),
                                                           ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(
+                                                      10,
+                                                      10,
+                                                      10,
+                                                      12,
+                                                    ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      card.word,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow
+                                                          .ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 17,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        color: Color(
+                                                          0xFF2A1D3B,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      card.meaning,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow
+                                                          .ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Color(
+                                                          0xFF627485,
                                                         ),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                               ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    card.word,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 17,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: Color(0xFF2A1D3B),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    card.meaning,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Color(0xFF627485),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     );
@@ -1015,17 +1066,25 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 }
 
 class _AmbientBlob extends StatelessWidget {
-  const _AmbientBlob({required this.size, required this.color});
+  const _AmbientBlob({
+    required this.size,
+    required this.color,
+    this.blurSigma = 16,
+  });
 
   final double size;
   final Color color;
+  final double blurSigma;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
     );
   }
 }
@@ -1171,29 +1230,20 @@ class _DictionaryCardGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withValues(alpha: 0.92),
-              const Color(0xFFF6FAFF).withValues(alpha: 0.96),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      child: _GlassCard(
+        borderRadius: BorderRadius.circular(20),
+        boxShadows: [
+          BoxShadow(
+            color: const Color(0xFF7EA7C9).withValues(alpha: 0.20),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.85),
+          BoxShadow(
+            color: const Color(0xFF1D3557).withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF7EA7C9).withValues(alpha: 0.14),
-              blurRadius: 14,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.hardEdge,
+        ],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1243,7 +1293,7 @@ class _DictionaryCardGridItem extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.86),
+                          color: Colors.white.withValues(alpha: 0.68),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -1313,7 +1363,7 @@ class _DictionaryCardGridItem extends StatelessWidget {
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEAF3FE),
+                        color: Colors.white.withValues(alpha: 0.62),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
@@ -1333,6 +1383,37 @@ class _DictionaryCardGridItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _GlassCard extends StatelessWidget {
+  const _GlassCard({
+    required this.child,
+    required this.borderRadius,
+    this.boxShadows,
+  });
+
+  final Widget child;
+  final BorderRadius borderRadius;
+  final List<BoxShadow>? boxShadows;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: borderRadius,
+          border: Border.all(
+            color: const Color(0xFFE2E8F0),
+            width: 1.0,
+          ),
+          boxShadow: boxShadows,
+        ),
+        child: child,
       ),
     );
   }

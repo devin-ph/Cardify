@@ -254,6 +254,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   DateTime? _practiceStartedAt;
   String? _recentlyMarkedKnownWordKey;
   String? _recentlyPostponedWordKey;
+  final List<String> _practiceQueueWordKeys = <String>[];
+  bool _isShowingPracticeCompleteDialog = false;
   final List<String> _postponedWordKeys = [];
   String? _loadedPostponedTopic;
   bool _loadingPostponedWords = false;
@@ -744,8 +746,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           .collection('users')
           .doc(user.uid)
           .get();
-      final remoteAutoPlay =
-          profileDoc.data()?['settings_auto_play_enabled'];
+      final remoteAutoPlay = profileDoc.data()?['settings_auto_play_enabled'];
       if (remoteAutoPlay is bool) {
         if (mounted) {
           setState(() {
@@ -889,8 +890,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         if (cleaned.isNotEmpty) {
           if (currentUser != null) {
             FirestoreSyncStatus.instance.reportWriting(
-              path:
-                  'users/${currentUser.uid}/postponed_words/$normalizedTopic',
+              path: 'users/${currentUser.uid}/postponed_words/$normalizedTopic',
               reason: 'ghi postponed words từ local cache',
             );
           }
@@ -1146,38 +1146,247 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     });
   }
 
-  List<Flashcard> _orderedPracticeFlashcards(
-    List<Flashcard> cards,
-    String topic,
-  ) {
-    final postponed = <Flashcard>[];
-    final normal = <Flashcard>[];
-    final known = <Flashcard>[];
+  bool _isKnownWordForPracticeSession(String wordKey) {
+    return _locallyKnownWordKeys.contains(wordKey);
+  }
 
-    for (final card in cards) {
+  List<String> _buildPracticeQueueWordKeys(List<Flashcard> sourceCards) {
+    final queue = <String>[];
+    for (final card in sourceCards) {
+      if (!_isFlashcardUnlocked(card)) {
+        continue;
+      }
       final key = card.word.trim().toLowerCase();
-      final isKnown =
-          _repository.isKnown(key, topic: topic) ||
-          _locallyKnownWordKeys.contains(key);
-      final isPostponed =
-          _postponedWordKeys.contains(key) || _recentlyPostponedWordKey == key;
-
-      if (isKnown) {
-        known.add(card);
-      } else if (isPostponed) {
-        postponed.add(card);
-      } else {
-        normal.add(card);
+      if (key.isEmpty || _isKnownWordForPracticeSession(key)) {
+        continue;
+      }
+      if (!queue.contains(key)) {
+        queue.add(key);
       }
     }
+    return queue;
+  }
 
-    postponed.sort((a, b) {
-      final aIndex = _postponedWordKeys.indexOf(a.word.trim().toLowerCase());
-      final bIndex = _postponedWordKeys.indexOf(b.word.trim().toLowerCase());
-      return aIndex.compareTo(bIndex);
+  List<Flashcard> _practiceFlashcardsFromQueue(List<Flashcard> cards) {
+    final cardByWord = <String, Flashcard>{
+      for (final card in cards) card.word.trim().toLowerCase(): card,
+    };
+
+    _practiceQueueWordKeys.removeWhere((wordKey) {
+      final card = cardByWord[wordKey];
+      if (card == null) {
+        return true;
+      }
+      if (!_isFlashcardUnlocked(card)) {
+        return true;
+      }
+      return _isKnownWordForPracticeSession(wordKey);
     });
 
-    return [...postponed, ...normal, ...known];
+    final queuedCards = <Flashcard>[];
+    for (final wordKey in _practiceQueueWordKeys) {
+      final card = cardByWord[wordKey];
+      if (card != null) {
+        queuedCards.add(card);
+      }
+    }
+    return queuedCards;
+  }
+
+  Future<void> _showPracticeCompletedDialog() async {
+    if (!mounted || _isShowingPracticeCompleteDialog) {
+      return;
+    }
+
+    _isShowingPracticeCompleteDialog = true;
+    try {
+      final accepted = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return WillPopScope(
+            onWillPop: () async => false,
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x220A5DB6),
+                      blurRadius: 20,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0A5DB6), Color(0xFF2F91FF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.celebration_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Bạn đã học xong',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Tuyệt vời! Hiện tại bạn đã hoàn thành toàn các thẻ trong chủ đề này',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF5C6D80),
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF0A5DB6),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                        ),
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        child: const Text(
+                          'OK',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (accepted != true) {
+        return;
+      }
+
+      setState(() {
+        _isPracticeMode = false;
+        _practiceStartedAt = null;
+        _recentlyMarkedKnownWordKey = null;
+        _recentlyPostponedWordKey = null;
+        _locallyKnownWordKeys.clear();
+        _practiceQueueWordKeys.clear();
+      });
+    } finally {
+      _isShowingPracticeCompleteDialog = false;
+    }
+  }
+
+  Future<void> _moveCurrentPracticeCardToQueueEnd({
+    required String wordKey,
+    required String topic,
+  }) async {
+    setState(() {
+      _recentlyMarkedKnownWordKey = null;
+      _recentlyPostponedWordKey = wordKey;
+
+      _practiceQueueWordKeys.remove(wordKey);
+      _practiceQueueWordKeys.add(wordKey);
+
+      _postponedWordKeys.remove(wordKey);
+      _postponedWordKeys.add(wordKey);
+    });
+
+    await _persistPostponedWordsForTopic(topic);
+
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _recentlyPostponedWordKey = null;
+    });
+  }
+
+  Future<void> _markCurrentPracticeCardAsKnown({
+    required String wordKey,
+    required String topic,
+  }) async {
+    setState(() {
+      _recentlyPostponedWordKey = null;
+      _recentlyMarkedKnownWordKey = wordKey;
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 240));
+    if (!mounted) {
+      return;
+    }
+
+    var shouldShowCompletion = false;
+    setState(() {
+      _locallyKnownWordKeys.add(wordKey);
+      _postponedWordKeys.remove(wordKey);
+      _practiceQueueWordKeys.remove(wordKey);
+      _recentlyMarkedKnownWordKey = null;
+      shouldShowCompletion = _practiceQueueWordKeys.isEmpty;
+    });
+
+    await _persistPostponedWordsForTopic(topic);
+    if (shouldShowCompletion) {
+      await _showPracticeCompletedDialog();
+    }
+  }
+
+  void _startPracticeMode({required List<Flashcard> sourceCards}) {
+    final queue = _buildPracticeQueueWordKeys(sourceCards);
+
+    setState(() {
+      _isPracticeMode = true;
+      _practiceStartedAt ??= DateTime.now();
+      _recentlyPostponedWordKey = null;
+      _recentlyMarkedKnownWordKey = null;
+      _locallyKnownWordKeys.clear();
+      _practiceQueueWordKeys
+        ..clear()
+        ..addAll(queue);
+    });
+
+    if (queue.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showPracticeCompletedDialog();
+      });
+    }
   }
 
   bool _containsVocabularyWord(String word, String sentence) {
@@ -1579,12 +1788,13 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(0xFFE2F3FF),
-                Color(0xFFFFF4FA),
-                Color(0xFFE4FAEF),
-                Color(0xFFF3E5FF),
+                Color.fromARGB(255, 245, 226, 237),
+                Color.fromARGB(255, 195, 217, 232),
+                Color.fromARGB(255, 219, 192, 243),
+                Color.fromARGB(255, 219, 248, 234),
+                Color.fromARGB(255, 244, 205, 205),
               ],
-              stops: [0.0, 0.3, 0.6, 1.0],
+              stops: [0.0, 0.3, 0.6, 0.8, 1.0],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -1604,220 +1814,370 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                   for (final card in savedCardsForTopic)
                     card.word.trim().toLowerCase(): card,
                 };
-              final flashcardsFromSaved = savedCardsForTopic
-                  .map(
-                    (card) => Flashcard(
-                      meaning: _displayMeaning(
-                        card.word,
-                        card.meaning,
-                        topic: displayTopic,
-                      ),
-                      image: _resolveFlashcardImage(
+                final flashcardsFromSaved = savedCardsForTopic
+                    .map(
+                      (card) => Flashcard(
+                        meaning: _displayMeaning(
+                          card.word,
+                          card.meaning,
+                          topic: displayTopic,
+                        ),
+                        image: _resolveFlashcardImage(
+                          word: card.word,
+                          meaning: card.meaning,
+                          topic: displayTopic,
+                          imageUrl: card.imageUrl,
+                        ),
                         word: card.word,
-                        meaning: card.meaning,
-                        topic: displayTopic,
-                        imageUrl: card.imageUrl,
+                        phonetic: card.phonetic,
+                        example: _exampleForDisplay(card.word, card.example),
+                        topic: card.topic,
+                        imageBytes: card.imageBytes,
+                        isUnlocked: unlockedWordKeys.contains(
+                          card.word.trim().toLowerCase(),
+                        ),
+                        lockedHint: _hintForWord(word: card.word),
                       ),
-                      word: card.word,
-                      phonetic: card.phonetic,
-                      example: _exampleForDisplay(card.word, card.example),
-                      topic: card.topic,
-                      imageBytes: card.imageBytes,
-                      isUnlocked: unlockedWordKeys.contains(
-                        card.word.trim().toLowerCase(),
-                      ),
-                      lockedHint: _hintForWord(word: card.word),
-                    ),
-                  )
-                  .toList();
+                    )
+                    .toList();
 
-              final sampleCards = _datasetItems
-                  .where((item) {
-                    final dbTopic = item['topic']?.toString() ?? '';
-                    final vnTopic = TopicClassifier.getVietnameseTopic(dbTopic);
-                    return vnTopic == displayTopic || dbTopic == displayTopic;
-                  })
-                  .map((item) {
-                    var w = item['word']?.toString().trim() ?? '';
-                    if (w.isEmpty) w = item['meaning']?.toString().trim() ?? '';
-                    return Flashcard(
-                      word: w,
-                      meaning: item['meaning']?.toString() ?? '',
-                      phonetic: item['phonetic']?.toString() ?? '',
-                      example: item['example']?.toString() ?? '',
-                      topic: displayTopic,
-                      imageBytes: null,
-                      image: 'assets/images/ephemeral.png',
-                    );
-                  })
-                  .toList();
-              final mergedFlashcards = <Flashcard>[...flashcardsFromSaved];
-              final existingWords = flashcardsFromSaved
-                  .map((card) => card.word.trim().toLowerCase())
-                  .toSet();
-              for (final sample in sampleCards) {
-                final key = sample.word.trim().toLowerCase();
-                if (!existingWords.contains(key)) {
-                  mergedFlashcards.add(sample);
-                  final sampleMeaning = _displayMeaning(
-                    sample.word,
-                    sample.meaning,
-                    topic: displayTopic,
-                  );
-                  mergedFlashcards[mergedFlashcards.length - 1] = Flashcard(
-                    image: _resolveFlashcardImage(
-                      word: sample.word,
-                      meaning: sample.meaning,
-                      topic: displayTopic,
-                      imageUrl: sample.image,
-                    ),
-                    word: sample.word,
-                    phonetic: sample.phonetic,
-                    meaning: sampleMeaning,
-                    example: _exampleForDisplay(sample.word, sample.example),
-                    topic: displayTopic,
-                    imageBytes: sample.imageBytes,
-                    isUnlocked: false,
-                    lockedHint: _hintForWord(word: sample.word),
-                  );
-                }
-              }
-
-              var trackedFlashcards = widget.showOnlyTrackedWords
-                  ? mergedFlashcards.where((card) {
-                      final key = card.word.trim().toLowerCase();
-                      final isKnown = _repository.isKnown(
-                        key,
-                        topic: displayTopic,
+                final sampleCards = _datasetItems
+                    .where((item) {
+                      final dbTopic = item['topic']?.toString() ?? '';
+                      final vnTopic = TopicClassifier.getVietnameseTopic(
+                        dbTopic,
                       );
-                      final isStudying =
-                          savedCardsByWord.containsKey(key) ||
-                          _postponedWordKeys.contains(key);
-                      return isKnown || isStudying;
-                    }).toList()
-                  : mergedFlashcards.toList();
+                      return vnTopic == displayTopic || dbTopic == displayTopic;
+                    })
+                    .map((item) {
+                      var w = item['word']?.toString().trim() ?? '';
+                      if (w.isEmpty)
+                        w = item['meaning']?.toString().trim() ?? '';
+                      return Flashcard(
+                        word: w,
+                        meaning: item['meaning']?.toString() ?? '',
+                        phonetic: item['phonetic']?.toString() ?? '',
+                        example: item['example']?.toString() ?? '',
+                        topic: displayTopic,
+                        imageBytes: null,
+                        image: 'assets/images/ephemeral.png',
+                      );
+                    })
+                    .toList();
+                final mergedFlashcards = <Flashcard>[...flashcardsFromSaved];
+                final existingWords = flashcardsFromSaved
+                    .map((card) => card.word.trim().toLowerCase())
+                    .toSet();
+                for (final sample in sampleCards) {
+                  final key = sample.word.trim().toLowerCase();
+                  if (!existingWords.contains(key)) {
+                    mergedFlashcards.add(sample);
+                    final sampleMeaning = _displayMeaning(
+                      sample.word,
+                      sample.meaning,
+                      topic: displayTopic,
+                    );
+                    mergedFlashcards[mergedFlashcards.length - 1] = Flashcard(
+                      image: _resolveFlashcardImage(
+                        word: sample.word,
+                        meaning: sample.meaning,
+                        topic: displayTopic,
+                        imageUrl: sample.image,
+                      ),
+                      word: sample.word,
+                      phonetic: sample.phonetic,
+                      meaning: sampleMeaning,
+                      example: _exampleForDisplay(sample.word, sample.example),
+                      topic: displayTopic,
+                      imageBytes: sample.imageBytes,
+                      isUnlocked: false,
+                      lockedHint: _hintForWord(word: sample.word),
+                    );
+                  }
+                }
 
-              trackedFlashcards.sort((a, b) {
-                if (a.isUnlocked && !b.isUnlocked) return -1;
-                if (!a.isUnlocked && b.isUnlocked) return 1;
-                return 0;
-              });
+                var trackedFlashcards = widget.showOnlyTrackedWords
+                    ? mergedFlashcards.where((card) {
+                        final key = card.word.trim().toLowerCase();
+                        final isKnown = _repository.isKnown(
+                          key,
+                          topic: displayTopic,
+                        );
+                        final isStudying =
+                            savedCardsByWord.containsKey(key) ||
+                            _postponedWordKeys.contains(key);
+                        return isKnown || isStudying;
+                      }).toList()
+                    : mergedFlashcards.toList();
 
-              final flashcards = _isPracticeMode
-                  ? _orderedPracticeFlashcards(trackedFlashcards, displayTopic)
-                  : trackedFlashcards;
-              final safeIndex = flashcards.isEmpty
-                  ? 0
-                  : (_isPracticeMode
-                        ? 0
-                        : _currentCardIndex % flashcards.length);
-              final currentFlashcard = flashcards.isEmpty
-                  ? null
-                  : flashcards[safeIndex];
-              final currentWordKey = currentFlashcard?.word
-                  .trim()
-                  .toLowerCase();
-              final currentCardUnlocked =
-                  currentFlashcard != null &&
-                  _isFlashcardUnlocked(currentFlashcard);
-              _scheduleAutoSpeakCurrentCard(currentFlashcard);
+                trackedFlashcards.sort((a, b) {
+                  if (a.isUnlocked && !b.isUnlocked) return -1;
+                  if (!a.isUnlocked && b.isUnlocked) return 1;
+                  return 0;
+                });
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.arrow_back, size: 28),
-                          onPressed: () => _closeWithPracticeResult(context),
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _isPracticeMode ? 'Luyện tập' : displayTopic,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                final flashcards = _isPracticeMode
+                    ? _practiceFlashcardsFromQueue(trackedFlashcards)
+                    : trackedFlashcards;
+                final safeIndex = flashcards.isEmpty
+                    ? 0
+                    : (_isPracticeMode
+                          ? 0
+                          : _currentCardIndex % flashcards.length);
+                final currentFlashcard = flashcards.isEmpty
+                    ? null
+                    : flashcards[safeIndex];
+                final currentWordKey = currentFlashcard?.word
+                    .trim()
+                    .toLowerCase();
+                final currentCardUnlocked =
+                    currentFlashcard != null &&
+                    _isFlashcardUnlocked(currentFlashcard);
+                _scheduleAutoSpeakCurrentCard(currentFlashcard);
+
+                if (_isPracticeMode &&
+                    flashcards.isEmpty &&
+                    !_isShowingPracticeCompleteDialog) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _showPracticeCompletedDialog();
+                  });
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.arrow_back, size: 28),
+                            onPressed: () => _closeWithPracticeResult(context),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Expanded(
-                    child: flashcards.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.library_add,
-                                  size: 64,
-                                  color: Colors.grey.shade400,
-                                ),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Ch╞░a c├│ tß╗½ n├áo trong bß╗Ö n├áy',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'H├úy th├¬m tß╗½ mß╗¢i tß╗½ mß╗Ñc Tß╗½ ─æiß╗ân',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                              ],
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _isPracticeMode ? 'Luyện tập' : displayTopic,
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          )
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              final carouselHeight =
-                                  (constraints.maxHeight - 220).clamp(
-                                    280.0,
-                                    500.0,
-                                  );
-                              final cardHeight = (carouselHeight - 20).clamp(
-                                260.0,
-                                480.0,
-                              );
-
-                              return Column(
-                                children: [
-                                  Text(
-                                    '${safeIndex + 1}/${flashcards.length}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black54,
-                                      fontWeight: FontWeight.w600,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Expanded(
+                      child: flashcards.isEmpty
+                          ? (_isPracticeMode
+                                ? const Center(
+                                    child: SizedBox(
+                                      width: 28,
+                                      height: 28,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                      ),
                                     ),
-                                  ),
-                                  SizedBox(height: 16),
-                                  SizedBox(
-                                    height: carouselHeight,
-                                    child: _isPracticeMode
-                                        ? Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                            ),
-                                            child: Stack(
-                                              alignment: Alignment.topCenter,
-                                              children: List.generate(3, (
-                                                layer,
-                                              ) {
-                                                final cardIndex =
-                                                    (safeIndex + layer) %
-                                                    flashcards.length;
-                                                final card =
-                                                    flashcards[cardIndex];
+                                  )
+                                : Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.library_add,
+                                          size: 64,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                        SizedBox(height: 16),
+                                        Text(
+                                          'Ch╞░a c├│ tß╗½ n├áo trong bß╗Ö n├áy',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'H├úy th├¬m tß╗½ mß╗¢i tß╗½ mß╗Ñc Tß╗½ ─æiß╗ân',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ))
+                          : LayoutBuilder(
+                              builder: (context, constraints) {
+                                final carouselHeight =
+                                    (constraints.maxHeight - 220).clamp(
+                                      280.0,
+                                      500.0,
+                                    );
+                                final cardHeight = (carouselHeight - 20).clamp(
+                                  260.0,
+                                  480.0,
+                                );
+
+                                return Column(
+                                  children: [
+                                    Text(
+                                      _isPracticeMode
+                                          ? '${flashcards.length}/${_practiceQueueWordKeys.length} thẻ còn lại'
+                                          : '${safeIndex + 1}/${flashcards.length}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    SizedBox(height: 16),
+                                    SizedBox(
+                                      height: carouselHeight,
+                                      child: _isPracticeMode
+                                          ? Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 10,
+                                                  ),
+                                              child: AnimatedSwitcher(
+                                                duration: const Duration(
+                                                  milliseconds: 220,
+                                                ),
+                                                switchInCurve:
+                                                    Curves.easeOutCubic,
+                                                switchOutCurve:
+                                                    Curves.easeInCubic,
+                                                transitionBuilder:
+                                                    (child, animation) {
+                                                      return SlideTransition(
+                                                        position: Tween<Offset>(
+                                                          begin: const Offset(
+                                                            0.08,
+                                                            0,
+                                                          ),
+                                                          end: Offset.zero,
+                                                        ).animate(animation),
+                                                        child: FadeTransition(
+                                                          opacity: animation,
+                                                          child: child,
+                                                        ),
+                                                      );
+                                                    },
+                                                child: Builder(
+                                                  key: ValueKey<String>(
+                                                    currentFlashcard == null
+                                                        ? 'practice-empty'
+                                                        : 'practice-${currentFlashcard.word.trim().toLowerCase()}',
+                                                  ),
+                                                  builder: (context) {
+                                                    final card =
+                                                        currentFlashcard;
+                                                    if (card == null) {
+                                                      return const SizedBox.shrink();
+                                                    }
+
+                                                    final wordKey = card.word
+                                                        .trim()
+                                                        .toLowerCase();
+                                                    final isKnown =
+                                                        _repository.isKnown(
+                                                          wordKey,
+                                                          topic: displayTopic,
+                                                        ) ||
+                                                        _locallyKnownWordKeys
+                                                            .contains(
+                                                              wordKey,
+                                                            ) ||
+                                                        _recentlyMarkedKnownWordKey ==
+                                                            wordKey;
+                                                    final isPostponed =
+                                                        _postponedWordKeys
+                                                            .contains(
+                                                              wordKey,
+                                                            ) ||
+                                                        _recentlyPostponedWordKey ==
+                                                            wordKey;
+
+                                                    return Center(
+                                                      child:
+                                                          _isFlashcardUnlocked(
+                                                            card,
+                                                          )
+                                                          ? FlipCard(
+                                                              key: ValueKey(
+                                                                'practice-card-${card.word}-${_practiceQueueWordKeys.length}',
+                                                              ),
+                                                              direction:
+                                                                  FlipDirection
+                                                                      .HORIZONTAL,
+                                                              front: FlashcardFront(
+                                                                flashcard: card,
+                                                                isKnown:
+                                                                    isKnown,
+                                                                isPostponed:
+                                                                    isPostponed,
+                                                                onSpeak: () =>
+                                                                    _speakWord(
+                                                                      card.word,
+                                                                    ),
+                                                                width: double
+                                                                    .infinity,
+                                                                height:
+                                                                    cardHeight,
+                                                              ),
+                                                              back: FlashcardBack(
+                                                                flashcard: card,
+                                                                isKnown:
+                                                                    isKnown,
+                                                                isPostponed:
+                                                                    isPostponed,
+                                                                onSpeak: () =>
+                                                                    _speakWord(
+                                                                      card.word,
+                                                                    ),
+                                                                width: double
+                                                                    .infinity,
+                                                                height:
+                                                                    cardHeight,
+                                                              ),
+                                                            )
+                                                          : LockedFlashcardView(
+                                                              flashcard: card,
+                                                              width: double
+                                                                  .infinity,
+                                                              height:
+                                                                  cardHeight,
+                                                              hintText:
+                                                                  _lockedHintForFlashcard(
+                                                                    card,
+                                                                  ),
+                                                            ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            )
+                                          : PageView.builder(
+                                              controller: _pageController,
+                                              padEnds: true,
+                                              itemCount: flashcards.length,
+                                              onPageChanged: (index) {
+                                                if (_currentCardIndex !=
+                                                    index) {
+                                                  setState(() {
+                                                    _currentCardIndex = index;
+                                                  });
+                                                }
+                                              },
+                                              itemBuilder: (context, index) {
+                                                final card = flashcards[index];
                                                 final wordKey = card.word
                                                     .trim()
                                                     .toLowerCase();
@@ -1836,35 +2196,69 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                     ) ||
                                                     _recentlyPostponedWordKey ==
                                                         wordKey;
-                                                final topOffset = (layer * 14.0)
-                                                    .clamp(0.0, 28.0);
-                                                final leftInset = (layer * 8.0)
-                                                    .clamp(0.0, 16.0);
-                                                final rightInset =
-                                                    (layer * 24.0).clamp(
-                                                      0.0,
-                                                      48.0,
-                                                    );
 
-                                                return Positioned(
-                                                  top: topOffset,
-                                                  left: leftInset,
-                                                  right: rightInset,
-                                                  child: IgnorePointer(
-                                                    ignoring: layer != 0,
-                                                    child: Opacity(
-                                                      opacity: layer == 0
-                                                          ? 1.0
-                                                          : (layer == 1
-                                                                ? 0.92
-                                                                : 0.86),
+                                                return AnimatedBuilder(
+                                                  animation: _pageController,
+                                                  builder: (context, child) {
+                                                    var page = _currentCardIndex
+                                                        .toDouble();
+                                                    if (_pageController
+                                                        .hasClients) {
+                                                      page =
+                                                          _pageController
+                                                              .page ??
+                                                          _currentCardIndex
+                                                              .toDouble();
+                                                    }
+
+                                                    final distance =
+                                                        (page - index)
+                                                            .abs()
+                                                            .clamp(0.0, 1.0);
+                                                    final scale =
+                                                        1.0 - (distance * 0.1);
+                                                    final opacity =
+                                                        1.0 - (distance * 0.25);
+                                                    final verticalOffset =
+                                                        distance * 6.0;
+
+                                                    return Opacity(
+                                                      opacity: opacity.clamp(
+                                                        0.75,
+                                                        1.0,
+                                                      ),
+                                                      child:
+                                                          Transform.translate(
+                                                            offset: Offset(
+                                                              0,
+                                                              verticalOffset,
+                                                            ),
+                                                            child:
+                                                                Transform.scale(
+                                                                  scale: scale
+                                                                      .clamp(
+                                                                        0.9,
+                                                                        1.0,
+                                                                      ),
+                                                                  child: child,
+                                                                ),
+                                                          ),
+                                                    );
+                                                  },
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 10,
+                                                        ),
+                                                    child: Center(
                                                       child:
                                                           _isFlashcardUnlocked(
                                                             card,
                                                           )
                                                           ? FlipCard(
                                                               key: ValueKey(
-                                                                'stack-card-$cardIndex-${card.word}',
+                                                                'slider-card-$index-${card.word}',
                                                               ),
                                                               direction:
                                                                   FlipDirection
@@ -1914,360 +2308,277 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                     ),
                                                   ),
                                                 );
-                                              }).reversed.toList(),
+                                              },
                                             ),
-                                          )
-                                        : PageView.builder(
-                                            controller: _pageController,
-                                            padEnds: true,
-                                            itemCount: flashcards.length,
-                                            onPageChanged: (index) {
-                                              if (_currentCardIndex != index) {
-                                                setState(() {
-                                                  _currentCardIndex = index;
-                                                });
-                                              }
-                                            },
-                                            itemBuilder: (context, index) {
-                                              final card = flashcards[index];
-                                              final wordKey = card.word
-                                                  .trim()
-                                                  .toLowerCase();
-                                              final isKnown =
-                                                  _repository.isKnown(
-                                                    wordKey,
-                                                    topic: displayTopic,
-                                                  ) ||
-                                                  _locallyKnownWordKeys
-                                                      .contains(wordKey) ||
-                                                  _recentlyMarkedKnownWordKey ==
-                                                      wordKey;
-                                              final isPostponed =
-                                                  _postponedWordKeys.contains(
-                                                    wordKey,
-                                                  ) ||
-                                                  _recentlyPostponedWordKey ==
-                                                      wordKey;
-
-                                              return AnimatedBuilder(
-                                                animation: _pageController,
-                                                builder: (context, child) {
-                                                  var page = _currentCardIndex
-                                                      .toDouble();
-                                                  if (_pageController
-                                                      .hasClients) {
-                                                    page =
-                                                        _pageController.page ??
-                                                        _currentCardIndex
-                                                            .toDouble();
-                                                  }
-
-                                                  final distance =
-                                                      (page - index)
-                                                          .abs()
-                                                          .clamp(0.0, 1.0);
-                                                  final scale =
-                                                      1.0 - (distance * 0.1);
-                                                  final opacity =
-                                                      1.0 - (distance * 0.25);
-                                                  final verticalOffset =
-                                                      distance * 6.0;
-
-                                                  return Opacity(
-                                                    opacity: opacity.clamp(
-                                                      0.75,
-                                                      1.0,
-                                                    ),
-                                                    child: Transform.translate(
-                                                      offset: Offset(
-                                                        0,
-                                                        verticalOffset,
-                                                      ),
-                                                      child: Transform.scale(
-                                                        scale: scale.clamp(
-                                                          0.9,
-                                                          1.0,
-                                                        ),
-                                                        child: child,
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 10,
-                                                        vertical: 10,
-                                                      ),
-                                                  child: Center(
-                                                    child:
-                                                        _isFlashcardUnlocked(
-                                                          card,
-                                                        )
-                                                        ? FlipCard(
-                                                            key: ValueKey(
-                                                              'slider-card-$index-${card.word}',
-                                                            ),
-                                                            direction:
-                                                                FlipDirection
-                                                                    .HORIZONTAL,
-                                                            front: FlashcardFront(
-                                                              flashcard: card,
-                                                              isKnown: isKnown,
-                                                              isPostponed:
-                                                                  isPostponed,
-                                                              onSpeak: () =>
-                                                                  _speakWord(
-                                                                    card.word,
-                                                                  ),
-                                                              width: double
-                                                                  .infinity,
-                                                              height:
-                                                                  cardHeight,
-                                                            ),
-                                                            back: FlashcardBack(
-                                                              flashcard: card,
-                                                              isKnown: isKnown,
-                                                              isPostponed:
-                                                                  isPostponed,
-                                                              onSpeak: () =>
-                                                                  _speakWord(
-                                                                    card.word,
-                                                                  ),
-                                                              width: double
-                                                                  .infinity,
-                                                              height:
-                                                                  cardHeight,
-                                                            ),
-                                                          )
-                                                        : LockedFlashcardView(
-                                                            flashcard: card,
-                                                            width:
-                                                                double.infinity,
-                                                            height: cardHeight,
-                                                            hintText:
-                                                                _lockedHintForFlashcard(
-                                                                  card,
-                                                                ),
-                                                          ),
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                  ),
-                                  SizedBox(height: 16),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24.0,
                                     ),
-                                    child: _isPracticeMode
-                                        ? Row(
-                                            children: [
-                                              Expanded(
-                                                child: OutlinedButton(
-                                                  style: OutlinedButton.styleFrom(
-                                                    foregroundColor:
-                                                        const Color(0xFF0A5DB6),
-                                                    side: const BorderSide(
-                                                      color: Color(0xFF0A5DB6),
-                                                      width: 1.5,
-                                                    ),
-                                                    shape: RoundedRectangleBorder(
+                                    SizedBox(height: 16),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24.0,
+                                      ),
+                                      child: _isPracticeMode
+                                          ? Row(
+                                              children: [
+                                                Expanded(
+                                                  child: DecoratedBox(
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
                                                       borderRadius:
                                                           BorderRadius.circular(
-                                                            8,
+                                                            14,
                                                           ),
-                                                    ),
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 14,
+                                                      border: Border.all(
+                                                        color: const Color(
+                                                          0xFF9BBDE3,
                                                         ),
-                                                  ),
-                                                  onPressed:
-                                                      currentFlashcard ==
-                                                              null ||
-                                                          !currentCardUnlocked
-                                                      ? null
-                                                      : () async {
-                                                          setState(() {
-                                                            _recentlyMarkedKnownWordKey =
-                                                                null;
-                                                            _recentlyPostponedWordKey =
-                                                                currentWordKey;
-                                                            if (currentWordKey !=
-                                                                null) {
-                                                              _postponedWordKeys
-                                                                  .remove(
-                                                                    currentWordKey,
-                                                                  );
-                                                              _postponedWordKeys
-                                                                  .insert(
-                                                                    0,
-                                                                    currentWordKey,
-                                                                  );
-                                                            }
-                                                          });
-                                                          _persistPostponedWordsForTopic(
-                                                            displayTopic,
-                                                          );
-
-                                                          await Future<
-                                                            void
-                                                          >.delayed(
-                                                            const Duration(
-                                                              milliseconds: 220,
-                                                            ),
-                                                          );
-                                                          if (!mounted) {
-                                                            return;
-                                                          }
-
-                                                          setState(() {
-                                                            _recentlyPostponedWordKey =
-                                                                null;
-                                                          });
-                                                        },
-                                                  child: const Text('Đang học'),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        const Color(0xFF0A5DB6),
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
+                                                        width: 1.2,
+                                                      ),
+                                                      boxShadow: const [
+                                                        BoxShadow(
+                                                          color: Color(
+                                                            0x140A5DB6,
                                                           ),
-                                                    ),
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 14,
+                                                          blurRadius: 8,
+                                                          offset: Offset(0, 4),
                                                         ),
-                                                  ),
-                                                  onPressed:
-                                                      currentWordKey == null ||
-                                                          !currentCardUnlocked
-                                                      ? null
-                                                      : () async {
-                                                          setState(() {
-                                                            _recentlyPostponedWordKey =
-                                                                null;
-                                                            _recentlyMarkedKnownWordKey =
-                                                                currentWordKey;
-                                                          });
-
-                                                          await Future<
-                                                            void
-                                                          >.delayed(
-                                                            const Duration(
-                                                              milliseconds: 320,
+                                                      ],
+                                                    ),
+                                                    child: OutlinedButton.icon(
+                                                      style: OutlinedButton.styleFrom(
+                                                        foregroundColor:
+                                                            const Color(
+                                                              0xFF1B5FAF,
                                                             ),
-                                                          );
-                                                          if (!mounted) {
-                                                            return;
-                                                          }
-
-                                                          setState(() {
-                                                            _locallyKnownWordKeys
-                                                                .add(
-                                                                  currentWordKey,
-                                                                );
-                                                            _repository.markKnown(
-                                                              currentWordKey,
-                                                              topic:
-                                                                  displayTopic,
-                                                            );
-                                                            _postponedWordKeys
-                                                                .remove(
-                                                                  currentWordKey,
-                                                                );
-                                                            _currentCardIndex =
-                                                                0;
-                                                            _recentlyMarkedKnownWordKey =
-                                                                null;
-                                                          });
-                                                          _persistPostponedWordsForTopic(
-                                                            displayTopic,
-                                                          );
-                                                        },
-                                                  child: const Text(
-                                                    'Đã nhớ',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
+                                                        side: BorderSide.none,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                14,
+                                                              ),
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 14,
+                                                            ),
+                                                      ),
+                                                      icon: const Icon(
+                                                        Icons.history_rounded,
+                                                        size: 20,
+                                                      ),
+                                                      label: const Text(
+                                                        'Đang học',
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                      onPressed:
+                                                          currentFlashcard ==
+                                                                  null ||
+                                                              !currentCardUnlocked
+                                                          ? null
+                                                          : () async {
+                                                              if (currentWordKey ==
+                                                                  null) {
+                                                                return;
+                                                              }
+                                                              await _moveCurrentPracticeCardToQueueEnd(
+                                                                wordKey:
+                                                                    currentWordKey,
+                                                                topic:
+                                                                    displayTopic,
+                                                              );
+                                                            },
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                            ],
-                                          )
-                                        : (widget.showOnlyTrackedWords
-                                              ? const SizedBox.shrink()
-                                              : SizedBox(
-                                                  width: double.infinity,
-                                                  child: ElevatedButton(
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor:
-                                                          const Color(
-                                                            0xFF0A5DB6,
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: DecoratedBox(
+                                                    decoration: BoxDecoration(
+                                                      gradient:
+                                                          const LinearGradient(
+                                                            colors: [
+                                                              Color(0xFF1AA36F),
+                                                              Color(0xFF43C98B),
+                                                            ],
+                                                            begin: Alignment
+                                                                .centerLeft,
+                                                            end: Alignment
+                                                                .centerRight,
                                                           ),
-                                                      foregroundColor:
-                                                          Colors.white,
-                                                      shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            14,
+                                                          ),
+                                                      boxShadow: const [
+                                                        BoxShadow(
+                                                          color: Color(
+                                                            0x2B1AA36F,
+                                                          ),
+                                                          blurRadius: 10,
+                                                          offset: Offset(0, 5),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: ElevatedButton.icon(
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor:
+                                                            Colors.transparent,
+                                                        foregroundColor:
+                                                            Colors.white,
+                                                        elevation: 0,
+                                                        shadowColor:
+                                                            Colors.transparent,
+                                                        surfaceTintColor:
+                                                            Colors.transparent,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                14,
+                                                              ),
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 14,
+                                                            ),
+                                                      ),
+                                                      icon: const Icon(
+                                                        Icons.check_rounded,
+                                                        size: 21,
+                                                      ),
+                                                      label: const Text(
+                                                        'Đã nhớ',
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          fontSize: 15,
+                                                        ),
+                                                      ),
+                                                      onPressed:
+                                                          currentWordKey ==
+                                                                  null ||
+                                                              !currentCardUnlocked
+                                                          ? null
+                                                          : () async {
+                                                              if (currentWordKey ==
+                                                                  null) {
+                                                                return;
+                                                              }
+                                                              await _markCurrentPracticeCardAsKnown(
+                                                                wordKey:
+                                                                    currentWordKey,
+                                                                topic:
+                                                                    displayTopic,
+                                                              );
+                                                            },
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : (widget.showOnlyTrackedWords
+                                                ? const SizedBox.shrink()
+                                                : SizedBox(
+                                                    width: double.infinity,
+                                                    child: DecoratedBox(
+                                                      decoration: BoxDecoration(
+                                                        gradient:
+                                                            const LinearGradient(
+                                                              colors: [
+                                                                Color(
+                                                                  0xFF0A5DB6,
+                                                                ),
+                                                                Color(
+                                                                  0xFF2F91FF,
+                                                                ),
+                                                              ],
+                                                              begin: Alignment
+                                                                  .centerLeft,
+                                                              end: Alignment
+                                                                  .centerRight,
+                                                            ),
                                                         borderRadius:
                                                             BorderRadius.circular(
-                                                              8,
+                                                              16,
                                                             ),
-                                                      ),
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            vertical: 14,
+                                                        boxShadow: const [
+                                                          BoxShadow(
+                                                            color: Color(
+                                                              0x330A5DB6,
+                                                            ),
+                                                            blurRadius: 14,
+                                                            offset: Offset(
+                                                              0,
+                                                              6,
+                                                            ),
                                                           ),
-                                                    ),
-                                                    onPressed:
-                                                        currentFlashcard == null
-                                                        ? null
-                                                        : () {
-                                                            setState(() {
-                                                              _isPracticeMode =
-                                                                  true;
-                                                              _practiceStartedAt ??=
-                                                                  DateTime.now();
-                                                              _recentlyPostponedWordKey =
-                                                                  null;
-                                                              _recentlyMarkedKnownWordKey =
-                                                                  null;
-                                                            });
-                                                          },
-                                                    child: const Text(
-                                                      'Luyện tập',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
+                                                        ],
+                                                      ),
+                                                      child: ElevatedButton.icon(
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor:
+                                                              Colors
+                                                                  .transparent,
+                                                          foregroundColor:
+                                                              Colors.white,
+                                                          elevation: 0,
+                                                          shadowColor: Colors
+                                                              .transparent,
+                                                          surfaceTintColor:
+                                                              Colors
+                                                                  .transparent,
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  16,
+                                                                ),
+                                                          ),
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                vertical: 16,
+                                                              ),
+                                                        ),
+                                                        onPressed:
+                                                            currentFlashcard ==
+                                                                null
+                                                            ? null
+                                                            : () {
+                                                                _startPracticeMode(
+                                                                  sourceCards:
+                                                                      trackedFlashcards,
+                                                                );
+                                                              },
+                                                        icon: const Icon(
+                                                          Icons.bolt_rounded,
+                                                          size: 20,
+                                                        ),
+                                                        label: const Text(
+                                                          'Luyện tập ngay',
+                                                          style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            fontSize: 16,
+                                                            letterSpacing: 0.2,
+                                                          ),
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
-                                                )),
-                                  ),
-                                  SizedBox(height: 8),
-                                ],
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              );
-            },
+                                                  )),
+                                    ),
+                                    SizedBox(height: 8),
+                                  ],
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 }
@@ -3025,6 +3336,36 @@ String _exampleForDisplay(String word, String example) {
       : '';
 }
 
+String _resolvedExampleForCard({
+  required String word,
+  required String example,
+}) {
+  final cleanedExample = _repairMojibakeText(example).trim();
+  final cleanedWord = word.trim();
+  final normalizedWord = cleanedWord.toLowerCase();
+
+  if (cleanedExample.isNotEmpty) {
+    final normalizedExample = cleanedExample.toLowerCase();
+    final basicPlaceholders = <String>{
+      normalizedWord,
+      'vi du: $normalizedWord',
+      'ví dụ: $normalizedWord',
+      'example: $normalizedWord',
+    };
+    if (!basicPlaceholders.contains(normalizedExample)) {
+      return cleanedExample;
+    }
+  }
+
+  if (cleanedWord.isEmpty) {
+    return 'Ví dụ: Em đang luyện từ vựng mỗi ngày.';
+  }
+
+  final quotedWord =
+      cleanedWord[0].toUpperCase() + cleanedWord.substring(1).toLowerCase();
+  return 'Ví dụ: I am learning the word "$quotedWord" today.';
+}
+
 String _wrapLongTokens(String input) {
   final text = input.trim();
   if (text.isEmpty) {
@@ -3178,6 +3519,12 @@ class FlashcardFront extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageSize = (height * 0.38).clamp(132.0, 188.0).toDouble();
+    final exampleText = _resolvedExampleForCard(
+      word: flashcard.word,
+      example: flashcard.example,
+    );
+
     return Card(
       elevation: 6,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -3195,26 +3542,26 @@ class FlashcardFront extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 112,
-                height: 112,
+                width: imageSize,
+                height: imageSize,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.blue.shade100, Colors.blue.shade200],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(28),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Padding(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(12),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(20),
                     child: _buildImage(),
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Text(
                 _wrapLongTokens(flashcard.word),
                 style: const TextStyle(
@@ -3233,16 +3580,45 @@ class FlashcardFront extends StatelessWidget {
                 textAlign: TextAlign.center,
                 softWrap: true,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F8FF),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFCCE2FF)),
+                ),
+                child: Text(
+                  _wrapLongTokens(exampleText),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.35,
+                    color: Color(0xFF2B4E66),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Align(
                 alignment: Alignment.bottomRight,
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.volume_up,
-                    color: Colors.blue,
-                    size: 34,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF3FF),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  onPressed: onSpeak,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.volume_up,
+                      color: Colors.blue,
+                      size: 30,
+                    ),
+                    onPressed: onSpeak,
+                  ),
                 ),
               ),
             ],
@@ -3312,6 +3688,12 @@ class FlashcardBack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageSize = (height * 0.38).clamp(132.0, 188.0).toDouble();
+    final exampleText = _resolvedExampleForCard(
+      word: flashcard.word,
+      example: flashcard.example,
+    );
+
     return Card(
       elevation: 6,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -3329,26 +3711,26 @@ class FlashcardBack extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 112,
-                height: 112,
+                width: imageSize,
+                height: imageSize,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.blue.shade100, Colors.blue.shade200],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(28),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Padding(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(12),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(20),
                     child: _buildImage(),
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Text(
                 _wrapLongTokens(flashcard.meaning),
                 style: const TextStyle(
@@ -3358,16 +3740,45 @@ class FlashcardBack extends StatelessWidget {
                 textAlign: TextAlign.center,
                 softWrap: true,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F8FF),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFCCE2FF)),
+                ),
+                child: Text(
+                  _wrapLongTokens(exampleText),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.35,
+                    color: Color(0xFF2B4E66),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Align(
                 alignment: Alignment.bottomRight,
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.volume_up,
-                    color: Colors.blue,
-                    size: 34,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF3FF),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  onPressed: onSpeak,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.volume_up,
+                      color: Colors.blue,
+                      size: 30,
+                    ),
+                    onPressed: onSpeak,
+                  ),
                 ),
               ),
             ],
