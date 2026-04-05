@@ -259,7 +259,6 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
   final List<String> _postponedWordKeys = [];
   String? _loadedPostponedTopic;
   bool _loadingPostponedWords = false;
-  final Set<String> _locallyKnownWordKeys = <String>{};
   final List<List<Flashcard>> allFlashcards = [
     [
       _sampleFlashcard('Chair', 'Ghß║┐'),
@@ -1139,25 +1138,31 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     final durationSeconds = practiced
         ? DateTime.now().difference(_practiceStartedAt!).inSeconds
         : 0;
+    final currentTopic = widget.selectedTopic ?? deckNames[selectedDeck];
 
     Navigator.of(context).pop({
       'practiced': practiced,
       'practiceDurationSeconds': durationSeconds < 0 ? 0 : durationSeconds,
+      'completedTopic': currentTopic,
+      'completed': practiced,
     });
   }
 
-  bool _isKnownWordForPracticeSession(String wordKey) {
-    return _locallyKnownWordKeys.contains(wordKey);
+  bool _isKnownWordForPracticeSession(String wordKey, {required String topic}) {
+    return _repository.isKnown(wordKey, topic: topic);
   }
 
-  List<String> _buildPracticeQueueWordKeys(List<Flashcard> sourceCards) {
+  List<String> _buildPracticeQueueWordKeys(
+    List<Flashcard> sourceCards, {
+    required String topic,
+  }) {
     final queue = <String>[];
     for (final card in sourceCards) {
       if (!_isFlashcardUnlocked(card)) {
         continue;
       }
       final key = card.word.trim().toLowerCase();
-      if (key.isEmpty || _isKnownWordForPracticeSession(key)) {
+      if (key.isEmpty || _isKnownWordForPracticeSession(key, topic: topic)) {
         continue;
       }
       if (!queue.contains(key)) {
@@ -1167,7 +1172,10 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     return queue;
   }
 
-  List<Flashcard> _practiceFlashcardsFromQueue(List<Flashcard> cards) {
+  List<Flashcard> _practiceFlashcardsFromQueue(
+    List<Flashcard> cards, {
+    required String topic,
+  }) {
     final cardByWord = <String, Flashcard>{
       for (final card in cards) card.word.trim().toLowerCase(): card,
     };
@@ -1180,7 +1188,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
       if (!_isFlashcardUnlocked(card)) {
         return true;
       }
-      return _isKnownWordForPracticeSession(wordKey);
+      return _isKnownWordForPracticeSession(wordKey, topic: topic);
     });
 
     final queuedCards = <Flashcard>[];
@@ -1299,13 +1307,16 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
         return;
       }
 
-      setState(() {
-        _isPracticeMode = false;
-        _practiceStartedAt = null;
-        _recentlyMarkedKnownWordKey = null;
-        _recentlyPostponedWordKey = null;
-        _locallyKnownWordKeys.clear();
-        _practiceQueueWordKeys.clear();
+      final durationSeconds = _practiceStartedAt == null
+          ? 0
+          : DateTime.now().difference(_practiceStartedAt!).inSeconds;
+      final currentTopic = widget.selectedTopic ?? deckNames[selectedDeck];
+
+      Navigator.of(context).pop({
+        'practiced': true,
+        'practiceDurationSeconds': durationSeconds < 0 ? 0 : durationSeconds,
+        'completedTopic': currentTopic,
+        'completed': true,
       });
     } finally {
       _isShowingPracticeCompleteDialog = false;
@@ -1326,6 +1337,9 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
       _postponedWordKeys.remove(wordKey);
       _postponedWordKeys.add(wordKey);
     });
+
+    // Keep status mutually exclusive: a card in "Đang học" should not stay "Đã nhớ".
+    _repository.unmarkKnown(wordKey, topic: topic);
 
     await _persistPostponedWordsForTopic(topic);
 
@@ -1355,12 +1369,13 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
 
     var shouldShowCompletion = false;
     setState(() {
-      _locallyKnownWordKeys.add(wordKey);
       _postponedWordKeys.remove(wordKey);
       _practiceQueueWordKeys.remove(wordKey);
       _recentlyMarkedKnownWordKey = null;
       shouldShowCompletion = _practiceQueueWordKeys.isEmpty;
     });
+
+    _repository.markKnown(wordKey, topic: topic);
 
     await _persistPostponedWordsForTopic(topic);
     if (shouldShowCompletion) {
@@ -1368,15 +1383,68 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
     }
   }
 
-  void _startPracticeMode({required List<Flashcard> sourceCards}) {
-    final queue = _buildPracticeQueueWordKeys(sourceCards);
+  Future<void> _resetPracticeProgressForTopic({
+    required List<Flashcard> sourceCards,
+    required String topic,
+  }) async {
+    final topicKey = topic.trim();
+    if (topicKey.isEmpty) {
+      return;
+    }
+
+    final resetWordKeys = <String>{};
+    for (final card in sourceCards) {
+      if (!_isFlashcardUnlocked(card)) {
+        continue;
+      }
+      final key = card.word.trim().toLowerCase();
+      if (key.isNotEmpty) {
+        resetWordKeys.add(key);
+      }
+    }
+
+    for (final key in resetWordKeys) {
+      _repository.unmarkKnown(key, topic: topicKey);
+    }
+
+    if (mounted) {
+      setState(() {
+        _postponedWordKeys.removeWhere(resetWordKeys.contains);
+        _recentlyMarkedKnownWordKey = null;
+        _recentlyPostponedWordKey = null;
+      });
+    } else {
+      _postponedWordKeys.removeWhere(resetWordKeys.contains);
+      _recentlyMarkedKnownWordKey = null;
+      _recentlyPostponedWordKey = null;
+    }
+
+    await _persistPostponedWordsForTopic(topicKey);
+  }
+
+  Future<void> _startPracticeMode({
+    required List<Flashcard> sourceCards,
+    required String topic,
+  }) async {
+    var queue = _buildPracticeQueueWordKeys(sourceCards, topic: topic);
+
+    if (queue.isEmpty) {
+      await _resetPracticeProgressForTopic(
+        sourceCards: sourceCards,
+        topic: topic,
+      );
+      queue = _buildPracticeQueueWordKeys(sourceCards, topic: topic);
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       _isPracticeMode = true;
       _practiceStartedAt ??= DateTime.now();
       _recentlyPostponedWordKey = null;
       _recentlyMarkedKnownWordKey = null;
-      _locallyKnownWordKeys.clear();
       _practiceQueueWordKeys
         ..clear()
         ..addAll(queue);
@@ -1917,8 +1985,15 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                 });
 
                 final flashcards = _isPracticeMode
-                    ? _practiceFlashcardsFromQueue(trackedFlashcards)
+                    ? _practiceFlashcardsFromQueue(
+                        trackedFlashcards,
+                        topic: displayTopic,
+                      )
                     : trackedFlashcards;
+                final openedCardsCount = trackedFlashcards
+                    .where(_isFlashcardUnlocked)
+                    .length;
+                final totalCardsCount = trackedFlashcards.length;
                 final safeIndex = flashcards.isEmpty
                     ? 0
                     : (_isPracticeMode
@@ -2028,8 +2103,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                   children: [
                                     Text(
                                       _isPracticeMode
-                                          ? '${flashcards.length}/${_practiceQueueWordKeys.length} thẻ còn lại'
-                                          : '${safeIndex + 1}/${flashcards.length}',
+                                          ? '${_practiceQueueWordKeys.length} thẻ còn lại'
+                                          : '$openedCardsCount/$totalCardsCount',
                                       style: const TextStyle(
                                         fontSize: 14,
                                         color: Colors.black54,
@@ -2091,10 +2166,6 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                           wordKey,
                                                           topic: displayTopic,
                                                         ) ||
-                                                        _locallyKnownWordKeys
-                                                            .contains(
-                                                              wordKey,
-                                                            ) ||
                                                         _recentlyMarkedKnownWordKey ==
                                                             wordKey;
                                                     final isPostponed =
@@ -2123,6 +2194,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                                     isKnown,
                                                                 isPostponed:
                                                                     isPostponed,
+                                                                practiceModeLayout:
+                                                                    true,
                                                                 onSpeak: () =>
                                                                     _speakWord(
                                                                       card.word,
@@ -2138,6 +2211,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                                     isKnown,
                                                                 isPostponed:
                                                                     isPostponed,
+                                                                practiceModeLayout:
+                                                                    true,
                                                                 onSpeak: () =>
                                                                     _speakWord(
                                                                       card.word,
@@ -2186,8 +2261,6 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                       wordKey,
                                                       topic: displayTopic,
                                                     ) ||
-                                                    _locallyKnownWordKeys
-                                                        .contains(wordKey) ||
                                                     _recentlyMarkedKnownWordKey ==
                                                         wordKey;
                                                 final isPostponed =
@@ -2269,6 +2342,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                                     isKnown,
                                                                 isPostponed:
                                                                     isPostponed,
+                                                                practiceModeLayout:
+                                                                    false,
                                                                 onSpeak: () =>
                                                                     _speakWord(
                                                                       card.word,
@@ -2284,6 +2359,8 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                                     isKnown,
                                                                 isPostponed:
                                                                     isPostponed,
+                                                                practiceModeLayout:
+                                                                    false,
                                                                 onSpeak: () =>
                                                                     _speakWord(
                                                                       card.word,
@@ -2543,10 +2620,12 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                                                             currentFlashcard ==
                                                                 null
                                                             ? null
-                                                            : () {
-                                                                _startPracticeMode(
+                                                            : () async {
+                                                                await _startPracticeMode(
                                                                   sourceCards:
                                                                       trackedFlashcards,
+                                                                  topic:
+                                                                      displayTopic,
                                                                 );
                                                               },
                                                         icon: const Icon(
@@ -3463,6 +3542,7 @@ class FlashcardFront extends StatelessWidget {
   final Flashcard flashcard;
   final bool isKnown;
   final bool isPostponed;
+  final bool practiceModeLayout;
   final VoidCallback onSpeak;
   final double width;
   final double height;
@@ -3471,6 +3551,7 @@ class FlashcardFront extends StatelessWidget {
     required this.flashcard,
     required this.isKnown,
     this.isPostponed = false,
+    this.practiceModeLayout = false,
     required this.onSpeak,
     this.width = 320,
     this.height = 420,
@@ -3563,7 +3644,9 @@ class FlashcardFront extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                _wrapLongTokens(flashcard.word),
+                _wrapLongTokens(
+                  practiceModeLayout ? flashcard.meaning : flashcard.word,
+                ),
                 style: const TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
@@ -3571,56 +3654,69 @@ class FlashcardFront extends StatelessWidget {
                 textAlign: TextAlign.center,
                 softWrap: true,
               ),
-              const SizedBox(height: 8),
-              Text(
-                flashcard.phonetic.trim().isEmpty
-                    ? _wrapLongTokens('/${flashcard.word.toLowerCase()}/')
-                    : _wrapLongTokens(flashcard.phonetic),
-                style: const TextStyle(fontSize: 18, color: Colors.blueGrey),
-                textAlign: TextAlign.center,
-                softWrap: true,
-              ),
-              const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F8FF),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFCCE2FF)),
-                ),
-                child: Text(
-                  _wrapLongTokens(exampleText),
-                  textAlign: TextAlign.center,
+              if (!practiceModeLayout) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _wrapLongTokens(flashcard.meaning),
                   style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.35,
+                    fontSize: 20,
                     color: Color(0xFF2B4E66),
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
+                  textAlign: TextAlign.center,
+                  softWrap: true,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Container(
+                const SizedBox(height: 8),
+                Text(
+                  flashcard.phonetic.trim().isEmpty
+                      ? _wrapLongTokens('/${flashcard.word.toLowerCase()}/')
+                      : _wrapLongTokens(flashcard.phonetic),
+                  style: const TextStyle(fontSize: 18, color: Colors.blueGrey),
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAF3FF),
+                    color: const Color(0xFFF3F8FF),
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFCCE2FF)),
                   ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.volume_up,
-                      color: Colors.blue,
-                      size: 30,
+                  child: Text(
+                    _wrapLongTokens(exampleText),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.35,
+                      color: Color(0xFF2B4E66),
+                      fontWeight: FontWeight.w500,
                     ),
-                    onPressed: onSpeak,
                   ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF3FF),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.volume_up,
+                        color: Colors.blue,
+                        size: 30,
+                      ),
+                      onPressed: onSpeak,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -3633,6 +3729,7 @@ class FlashcardBack extends StatelessWidget {
   final Flashcard flashcard;
   final bool isKnown;
   final bool isPostponed;
+  final bool practiceModeLayout;
   final VoidCallback onSpeak;
   final double width;
   final double height;
@@ -3641,6 +3738,7 @@ class FlashcardBack extends StatelessWidget {
     required this.flashcard,
     required this.isKnown,
     this.isPostponed = false,
+    this.practiceModeLayout = false,
     required this.onSpeak,
     this.width = 320,
     this.height = 420,
@@ -3732,7 +3830,9 @@ class FlashcardBack extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                _wrapLongTokens(flashcard.meaning),
+                _wrapLongTokens(
+                  practiceModeLayout ? flashcard.word : flashcard.meaning,
+                ),
                 style: const TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
@@ -3740,6 +3840,17 @@ class FlashcardBack extends StatelessWidget {
                 textAlign: TextAlign.center,
                 softWrap: true,
               ),
+              if (practiceModeLayout) ...[
+                const SizedBox(height: 8),
+                Text(
+                  flashcard.phonetic.trim().isEmpty
+                      ? _wrapLongTokens('/${flashcard.word.toLowerCase()}/')
+                      : _wrapLongTokens(flashcard.phonetic),
+                  style: const TextStyle(fontSize: 18, color: Colors.blueGrey),
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                ),
+              ],
               const SizedBox(height: 14),
               Container(
                 width: double.infinity,

@@ -465,7 +465,7 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'Ban dang noi: $_listeningText',
+                  'Bạn đang nói : $_listeningText',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.black54),

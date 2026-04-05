@@ -10,6 +10,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/firestore_sync_status.dart';
+import 'services/class_schedule_notification_service.dart';
 import 'services/xp_service.dart';
 
 Future<void> main() async {
@@ -38,6 +39,11 @@ Future<void> main() async {
       url: supabaseUrl!.trim(),
       anonKey: supabaseAnonKey!.trim(),
     );
+  }
+  try {
+    await ClassScheduleNotificationService.instance.initialize();
+  } catch (_) {
+    // Keep app startup working if notification setup is unavailable.
   }
   runApp(const MyApp());
 }

@@ -68,6 +68,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       return;
     }
 
+    final avatarBase64 = (_avatarBytes != null && _avatarBytes!.isNotEmpty)
+        ? base64Encode(_avatarBytes!)
+        : null;
+
     try {
       FirestoreSyncStatus.instance.reportWriting(
         path: 'users/${docRef.id}',
@@ -75,6 +79,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       );
       await docRef.set({
         'display_name': _name,
+        'avatar_base64': avatarBase64,
         'settings_ai_hints_enabled': _aiHintsEnabled,
         'settings_auto_play_enabled': _autoPlayPronunciation,
         'settings_ai_chat_narrator_enabled': _aiChatNarratorEnabled,
@@ -150,11 +155,21 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       }
 
       final remoteName = data['display_name']?.toString().trim();
+      final remoteAvatarBase64 = data['avatar_base64']?.toString().trim();
       final remoteAiHints = data['settings_ai_hints_enabled'];
       final remoteAutoPlay = data['settings_auto_play_enabled'];
       final remoteNarrator = data['settings_ai_chat_narrator_enabled'];
       final remoteReminder = data['settings_daily_reminder'];
       final remoteCompact = data['settings_compact_layout'];
+
+      Uint8List? remoteAvatarBytes;
+      if (remoteAvatarBase64 != null && remoteAvatarBase64.isNotEmpty) {
+        try {
+          remoteAvatarBytes = base64Decode(remoteAvatarBase64);
+        } catch (_) {
+          remoteAvatarBytes = null;
+        }
+      }
 
       if (!mounted) {
         return;
@@ -164,6 +179,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         if (remoteName != null && remoteName.isNotEmpty) {
           _name = remoteName;
         }
+        _avatarBytes = remoteAvatarBytes ?? _avatarBytes;
         if (remoteAiHints is bool) {
           _aiHintsEnabled = remoteAiHints;
         }
@@ -182,6 +198,11 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       });
 
       await prefs.setString(_nameKey, _name);
+      if (_avatarBytes == null || _avatarBytes!.isEmpty) {
+        await prefs.remove(_avatarKey);
+      } else {
+        await prefs.setString(_avatarKey, base64Encode(_avatarBytes!));
+      }
       await prefs.setBool(_aiHintsKey, _aiHintsEnabled);
       await prefs.setBool(_autoPlayKey, _autoPlayPronunciation);
       await prefs.setBool(_aiChatNarratorKey, _aiChatNarratorEnabled);
@@ -272,8 +293,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     try {
       final image = await _imagePicker.pickImage(
         source: source,
-        imageQuality: 85,
-        maxWidth: 1080,
+        imageQuality: 72,
+        maxWidth: 360,
+        maxHeight: 360,
       );
       if (image == null) {
         return;

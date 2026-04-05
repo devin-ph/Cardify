@@ -50,64 +50,61 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BottomAppBar(
-      shape: UpwardNotchedShape(notchHeight: 18), // notch nhích lên trên
-      notchMargin: 0.0,
-      color: Color.fromARGB(255, 255, 243, 255),
-      child: Row(
-        children: [
-          Expanded(
-            child: _NavIconItem(
-              icon: Icons.home,
-              color: currentIndex == 0
-                  ? Colors.blue
-                  : const Color.fromARGB(255, 47, 34, 34),
-              tooltip: 'Trang chủ',
-              onTap: () => onTap(0),
-            ),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 5),
+      child: BottomAppBar(
+        shape: UpwardNotchedShape(notchHeight: 24), // notch nổi rõ quanh camera
+        notchMargin: 6.0,
+        color: const Color.fromARGB(255, 253, 253, 253),
+        elevation: 8,
+        child: SizedBox(
+          height: 74,
+          child: Row(
+            children: [
+              Expanded(
+                child: _NavIconItem(
+                  icon: Icons.home,
+                  label: 'Trang chủ',
+                  isSelected: currentIndex == 0,
+                  onTap: () => onTap(0),
+                ),
+              ),
+              Expanded(
+                child: _NavIconItem(
+                  icon: Icons.calendar_today,
+                  label: 'Lịch',
+                  isSelected: currentIndex == 1,
+                  onTap: () => onTap(1),
+                ),
+              ),
+              Expanded(
+                child: _NavIconItem(
+                  icon: Icons.menu_book,
+                  label: 'Bộ sưu tập',
+                  isSelected: currentIndex == 2,
+                  onTap: () => onTap(2),
+                ),
+              ),
+              Expanded(
+                child: _NavIconItem(
+                  icon: Icons.style,
+                  label: 'Ôn tập',
+                  isSelected: currentIndex == 3,
+                  onTap: () => onTap(3),
+                ),
+              ),
+              Expanded(
+                child: _NavIconItem(
+                  icon: Icons.emoji_events,
+                  label: 'Thành tích',
+                  isSelected: currentIndex == 4,
+                  onTap: () => onTap(4),
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: _NavIconItem(
-              icon: Icons.calendar_today,
-              color: currentIndex == 1
-                  ? Colors.blue
-                  : const Color.fromARGB(255, 47, 34, 34),
-              tooltip: 'Lịch',
-              onTap: () => onTap(1),
-            ),
-          ),
-          const SizedBox(width: 00), // khoảng trống cho nút chụp ảnh
-          Expanded(
-            child: _NavIconItem(
-              icon: Icons.menu_book,
-              color: currentIndex == 2
-                  ? Colors.blue
-                  : const Color.fromARGB(255, 47, 34, 34),
-              tooltip: 'Từ điển',
-              onTap: () => onTap(2),
-            ),
-          ),
-          Expanded(
-            child: _NavIconItem(
-              icon: Icons.style,
-              color: currentIndex == 3
-                  ? Colors.blue
-                  : const Color.fromARGB(255, 58, 53, 53),
-              tooltip: 'Ôn tập',
-              onTap: () => onTap(3),
-            ),
-          ),
-          Expanded(
-            child: _NavIconItem(
-              icon: Icons.emoji_events,
-              color: currentIndex == 4
-                  ? Colors.blue
-                  : const Color.fromARGB(255, 47, 34, 34),
-              tooltip: 'Thành tích',
-              onTap: () => onTap(4),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -115,23 +112,26 @@ class CustomBottomNavBar extends StatelessWidget {
 
 class _NavIconItem extends StatelessWidget {
   final IconData icon;
-  final Color color;
-  final String tooltip;
+  final String label;
+  final bool isSelected;
   final VoidCallback onTap;
 
   const _NavIconItem({
     required this.icon,
-    required this.color,
-    required this.tooltip,
+    required this.label,
+    required this.isSelected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    const activeColor = Color(0xFF8B5CF6);
+    const inactiveColor = Color(0xFF9CA3AF);
+
     return Tooltip(
-      message: tooltip,
+      message: label,
       child: Semantics(
-        label: tooltip,
+        label: label,
         button: true,
         child: Material(
           color: Colors.transparent,
@@ -141,8 +141,40 @@ class _NavIconItem extends StatelessWidget {
             highlightColor: Colors.transparent,
             borderRadius: BorderRadius.circular(22),
             child: SizedBox(
-              height: 48,
-              child: Center(child: Icon(icon, color: color)),
+              height: 64,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    width: isSelected ? 55 : 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: isSelected ? activeColor : Colors.transparent,
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: isSelected ? Colors.white : inactiveColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w600,
+                      color: isSelected ? activeColor : inactiveColor,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

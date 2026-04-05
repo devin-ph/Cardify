@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
@@ -5,9 +6,11 @@ import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/class_schedule_notification_service.dart';
 import '../services/firestore_sync_status.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/topic_classifier.dart';
@@ -57,6 +60,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Map<String, String> _scheduledTimeByDay = <String, String>{};
   Map<String, int> _scheduledStyleByDay = <String, int>{};
   int _lastSyncedStreak = -1;
+  Timer? _countdownTicker;
+  OverlayEntry? _underFifteenMessageEntry;
 
   @override
   void initState() {
@@ -69,12 +74,121 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _onCardsChanged();
     _loadAppStartDate();
     _loadSchedules();
+    _startCountdownTicker();
   }
 
   @override
   void dispose() {
+    _countdownTicker?.cancel();
+    _underFifteenMessageEntry?.remove();
     _repository.cardsNotifier.removeListener(_onCardsChanged);
     super.dispose();
+  }
+
+  void _showUnderFifteenMinutesToast() {
+    if (!mounted) {
+      return;
+    }
+
+    _underFifteenMessageEntry?.remove();
+    _underFifteenMessageEntry = null;
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    if (overlay == null) {
+      return;
+    }
+
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayContext) {
+        final topPadding = MediaQuery.of(overlayContext).padding.top;
+        return Positioned(
+          top: topPadding + 14,
+          left: 16,
+          right: 16,
+          child: IgnorePointer(
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2B2F3A).withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.notifications_active_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          'Lịch học còn dưới 15 phút',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    _underFifteenMessageEntry = entry;
+    overlay.insert(entry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted || !identical(_underFifteenMessageEntry, entry)) {
+        return;
+      }
+      entry.remove();
+      _underFifteenMessageEntry = null;
+    });
+  }
+
+  void _startCountdownTicker() {
+    _countdownTicker?.cancel();
+
+    final now = DateTime.now();
+    final initialDelay = Duration(
+      seconds: 60 - now.second,
+      milliseconds: 1000 - now.millisecond,
+    );
+
+    _countdownTicker = Timer(initialDelay, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+      _countdownTicker = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {});
+      });
+    });
   }
 
   DocumentReference<Map<String, dynamic>>? _learningStateDoc() {
@@ -181,6 +295,52 @@ class _CalendarScreenState extends State<CalendarScreen> {
       FirestoreSyncStatus.instance.reportError(
         path: 'users/${docRef.parent.parent?.id}/learning_state/state',
         operation: 'write schedules',
+        error: error,
+      );
+    }
+  }
+
+  Future<void> _deleteScheduleDayFromFirebase(String dayKey) async {
+    final normalizedKey = dayKey.trim();
+    if (normalizedKey.isEmpty) {
+      return;
+    }
+
+    final docRef = _learningStateDoc();
+    if (docRef == null) {
+      return;
+    }
+
+    final userId = docRef.parent.parent?.id ?? '{uid}';
+    try {
+      FirestoreSyncStatus.instance.reportWriting(
+        path: 'users/$userId/learning_state/state',
+        reason: 'xóa lịch học ngày $normalizedKey',
+      );
+
+      await docRef.update({
+        'scheduled_decks_by_day.$normalizedKey': FieldValue.delete(),
+        'scheduled_time_by_day.$normalizedKey': FieldValue.delete(),
+        'scheduled_style_by_day.$normalizedKey': FieldValue.delete(),
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      FirestoreSyncStatus.instance.reportSuccess(
+        path: 'users/$userId/learning_state/state',
+        message: 'Đã xóa lịch học ngày $normalizedKey trên Firestore',
+      );
+    } on FirebaseException catch (error) {
+      if (error.code != 'not-found') {
+        FirestoreSyncStatus.instance.reportError(
+          path: 'users/$userId/learning_state/state',
+          operation: 'delete schedule day',
+          error: error,
+        );
+      }
+    } catch (error) {
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/$userId/learning_state/state',
+        operation: 'delete schedule day',
         error: error,
       );
     }
@@ -294,6 +454,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
       parsedTime.hour,
       parsedTime.minute,
     );
+  }
+
+  DateTime _combineDateAndTime(DateTime date, TimeOfDay time) {
+    final normalizedDate = DateUtils.dateOnly(date);
+    return DateTime(
+      normalizedDate.year,
+      normalizedDate.month,
+      normalizedDate.day,
+      time.hour,
+      time.minute,
+    );
+  }
+
+  Future<void> _syncNotificationReminders() async {
+    try {
+      await ClassScheduleNotificationService.instance.syncSchedules(
+        scheduledDecksByDay: _scheduledDecksByDay,
+        scheduledTimeByDay: _scheduledTimeByDay,
+      );
+    } catch (_) {
+      // Notification support is best-effort and must not block the calendar.
+    }
   }
 
   Future<void> _loadAppStartDate() async {
@@ -452,6 +634,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _scheduledTimeByDay = parsedTimes;
         _scheduledStyleByDay = parsedStyles;
         _refreshCalendarStats();
+        await _syncNotificationReminders();
         return;
       }
 
@@ -461,6 +644,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _scheduledStyleByDay = parsedStyles;
         _refreshCalendarStats();
       });
+      await _syncNotificationReminders();
 
       final docRef = _learningStateDoc();
       if (docRef == null) {
@@ -527,6 +711,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             _scheduledStyleByDay = migratedStyles;
             _refreshCalendarStats();
             await _persistSchedulesToFirebase();
+            await _syncNotificationReminders();
           }
           FirestoreSyncStatus.instance.reportSuccess(
             path: 'users/${docRef.parent.parent?.id}/learning_state/state',
@@ -540,6 +725,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             _scheduledStyleByDay.isNotEmpty) {
           await _persistSchedulesToFirebase();
         }
+        await _syncNotificationReminders();
         FirestoreSyncStatus.instance.reportSuccess(
           path: 'users/${docRef.parent.parent?.id}/learning_state/state',
           message: 'Đã xử lý lịch học khi chưa có dữ liệu cloud',
@@ -594,6 +780,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           remoteTimes.isNotEmpty ||
           remoteStyles.isNotEmpty) {
         if (!mounted) {
+          await _syncNotificationReminders();
           return;
         }
         setState(() {
@@ -615,10 +802,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
           _scheduleStyleStorageKey,
           jsonEncode(_scheduledStyleByDay),
         );
+        await _syncNotificationReminders();
       } else if (_scheduledDecksByDay.isNotEmpty ||
           _scheduledTimeByDay.isNotEmpty ||
           _scheduledStyleByDay.isNotEmpty) {
         await _persistSchedulesToFirebase();
+        await _syncNotificationReminders();
       }
       FirestoreSyncStatus.instance.reportSuccess(
         path: 'users/${docRef.parent.parent?.id}/learning_state/state',
@@ -652,6 +841,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       jsonEncode(_scheduledStyleByDay),
     );
     await _persistSchedulesToFirebase();
+    await _syncNotificationReminders();
   }
 
   bool _hasScheduleOnDate(DateTime date) {
@@ -761,6 +951,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _scheduledStyleByDay.remove(key);
       _refreshCalendarStats();
     });
+    await _deleteScheduleDayFromFirebase(key);
     await _persistSchedules();
   }
 
@@ -1066,10 +1257,43 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       );
                       return;
                     }
+
+                    final scheduleAt = _combineDateAndTime(
+                      _selectedDay,
+                      selectedTime!,
+                    );
+                    final now = DateTime.now();
+                    if (!scheduleAt.isAfter(now)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Không thể chọn giờ học trước thời điểm hiện tại.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final isUnderFifteenMinutes =
+                        scheduleAt.difference(now).inMinutes < 15;
                     await _saveSelectedDayDecks(
                       selected.toList(),
                       selectedTime: selectedTime,
                     );
+
+                    if (isUnderFifteenMinutes) {
+                      if (!context.mounted) {
+                        return;
+                      }
+                      _showUnderFifteenMinutesToast();
+                      await HapticFeedback.heavyImpact();
+                      await ClassScheduleNotificationService.instance
+                          .showImmediateUnderFifteenMinutesAlert(
+                            decks: selected.toList(),
+                            timeLabel: _timeToStorage(selectedTime!),
+                          );
+                    }
+
                     if (!dialogContext.mounted) {
                       return;
                     }
@@ -1115,6 +1339,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final now = DateTime.now();
     final target = _scheduleDateTime(schedule.date, schedule.time);
     final diff = target.difference(now);
+
+    if (diff.isNegative) {
+      return 'Quá hạn';
+    }
 
     if (diff.inMinutes >= 0 && diff.inHours < 24) {
       if (diff.inMinutes < 60) {

@@ -28,6 +28,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
   final SpeechToText _speech = SpeechToText();
   final TextEditingController _searchController = TextEditingController();
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
+  OverlayEntry? _lockedTopicMessageEntry;
 
   Map<String, int> _hintsCountCache = {};
 
@@ -170,8 +171,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
       return true;
     }
 
-    // Fallback: classify the query itself to a topic (works well for English terms
-    // such as "mountain", "keyboard", etc.) and compare against this deck title.
+    // Fallback: classify the query itself and compare against this deck title.
     final classifiedTopic = TopicClassifier.classifyWord(normalizedSearch, '');
     if (classifiedTopic == title) {
       return true;
@@ -190,6 +190,85 @@ class _DeckListScreenState extends State<DeckListScreen> {
     }
 
     return false;
+  }
+
+  void _showLockedTopicMessage() {
+    if (!mounted) {
+      return;
+    }
+
+    _lockedTopicMessageEntry?.remove();
+    _lockedTopicMessageEntry = null;
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    if (overlay == null) {
+      return;
+    }
+
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayContext) {
+        final topPadding = MediaQuery.of(overlayContext).padding.top;
+        return Positioned(
+          top: topPadding + 14,
+          left: 16,
+          right: 16,
+          child: IgnorePointer(
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2B2F3A).withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_rounded, color: Colors.white, size: 20),
+                      SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          'Vui lòng chụp ít nhất 1 thẻ để mở khóa chủ đề này!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    _lockedTopicMessageEntry = entry;
+    overlay.insert(entry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted || !identical(_lockedTopicMessageEntry, entry)) {
+        return;
+      }
+      entry.remove();
+      _lockedTopicMessageEntry = null;
+    });
   }
 
   @override
@@ -621,6 +700,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
   @override
   void dispose() {
     VocabularyService.instance.hintsNotifier.removeListener(_onHintsChanged);
+    _lockedTopicMessageEntry?.remove();
     _speech.stop();
     _searchController.dispose();
     super.dispose();
@@ -1116,17 +1196,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
             opacity: isLocked ? 0.52 : 1.0,
             child: InkWell(
               borderRadius: BorderRadius.circular(24),
-              onTap: isLocked
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Vui lòng chụp ít nhất 1 thẻ để mở khóa chủ đề này!',
-                          ),
-                        ),
-                      );
-                    }
-                  : onTap,
+              onTap: isLocked ? _showLockedTopicMessage : onTap,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
