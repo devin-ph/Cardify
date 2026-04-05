@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -18,7 +19,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
   static const String _scheduleStorageKey = 'calendar_scheduled_decks_by_day';
   static const String _scheduleTimeStorageKey =
       'calendar_scheduled_time_by_day';
+  static const String _scheduleStyleStorageKey =
+      'calendar_scheduled_style_by_day';
   static const String _appStartedAtKey = 'app_started_at_v1';
+
+  static const List<List<Color>> _upcomingScheduleGradients = [
+    [Color(0xFFFFE8D9), Color(0xFFFFD7E6), Color(0xFFF4ECFF)],
+    [Color(0xFFDDF7EA), Color(0xFFCFE9FF), Color(0xFFEDE3FF)],
+    [Color(0xFFFFE7B8), Color(0xFFFFD7C8), Color(0xFFF6E7FF)],
+    [Color(0xFFD9ECFF), Color(0xFFBFDFFF), Color(0xFF8FC4FF)],
+    [Color(0xFFF2E1FF), Color(0xFFD9F2EA), Color(0xFFFFE6C7)],
+  ];
 
   final SavedCardsRepository _repository = SavedCardsRepository.instance;
   DateTime _focusedDay = DateTime.now();
@@ -29,6 +40,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   late List<String> _availableDecks;
   Map<String, List<String>> _scheduledDecksByDay = <String, List<String>>{};
   Map<String, String> _scheduledTimeByDay = <String, String>{};
+  Map<String, int> _scheduledStyleByDay = <String, int>{};
 
   @override
   void initState() {
@@ -81,6 +93,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
       return null;
     }
     return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  int _gradientIndexForKey(String key) {
+    if (_upcomingScheduleGradients.isEmpty) {
+      return 0;
+    }
+    return Random(key.hashCode).nextInt(_upcomingScheduleGradients.length);
+  }
+
+  int _normalizedGradientIndex(int index) {
+    if (_upcomingScheduleGradients.isEmpty) {
+      return 0;
+    }
+    return index % _upcomingScheduleGradients.length;
+  }
+
+  List<Color> _gradientForScheduleKey(String key) {
+    final index = _scheduledStyleByDay[key] ?? _gradientIndexForKey(key);
+    return _upcomingScheduleGradients[_normalizedGradientIndex(index)];
   }
 
   String _formatTimeLabel(String? raw) {
@@ -216,9 +247,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
         }
       }
 
+      final rawStyles = prefs.getString(_scheduleStyleStorageKey);
+      final parsedStyles = <String, int>{};
+      if (rawStyles != null && rawStyles.isNotEmpty) {
+        final decodedStyles = jsonDecode(rawStyles);
+        if (decodedStyles is Map) {
+          for (final entry in decodedStyles.entries) {
+            final key = entry.key.toString();
+            final value = int.tryParse(entry.value.toString());
+            if (value != null) {
+              parsedStyles[key] = _normalizedGradientIndex(value);
+            }
+          }
+        }
+      }
+
       if (!mounted) {
         _scheduledDecksByDay = parsed;
         _scheduledTimeByDay = parsedTimes;
+        _scheduledStyleByDay = parsedStyles;
         _refreshCalendarStats();
         return;
       }
@@ -226,6 +273,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       setState(() {
         _scheduledDecksByDay = parsed;
         _scheduledTimeByDay = parsedTimes;
+        _scheduledStyleByDay = parsedStyles;
         _refreshCalendarStats();
       });
     } catch (_) {
@@ -245,6 +293,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     await prefs.setString(
       _scheduleTimeStorageKey,
       jsonEncode(_scheduledTimeByDay),
+    );
+    await prefs.setString(
+      _scheduleStyleStorageKey,
+      jsonEncode(_scheduledStyleByDay),
     );
   }
 
@@ -326,6 +378,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       if (selectedDecks.isEmpty) {
         _scheduledDecksByDay.remove(key);
         _scheduledTimeByDay.remove(key);
+        _scheduledStyleByDay.remove(key);
       } else {
         final uniqueSorted = selectedDecks.toSet().toList()..sort();
         _scheduledDecksByDay[key] = uniqueSorted;
@@ -334,10 +387,145 @@ class _CalendarScreenState extends State<CalendarScreen> {
         } else {
           _scheduledTimeByDay.remove(key);
         }
+        _scheduledStyleByDay.putIfAbsent(
+          key,
+          () => Random().nextInt(_upcomingScheduleGradients.length),
+        );
       }
       _refreshCalendarStats();
     });
     await _persistSchedules();
+  }
+
+  Future<void> _deleteScheduledDay(DateTime date) async {
+    final key = _dateKey(date);
+    setState(() {
+      _scheduledDecksByDay.remove(key);
+      _scheduledTimeByDay.remove(key);
+      _scheduledStyleByDay.remove(key);
+      _refreshCalendarStats();
+    });
+    await _persistSchedules();
+  }
+
+  Future<void> _confirmDeleteScheduledDay(_UpcomingSchedule schedule) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFFFFF4E8),
+                  Color(0xFFF8E9FF),
+                  Color(0xFFEAF6FF),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFFE5D4E1),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF9CB9D4).withValues(alpha: 0.24),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+                BoxShadow(
+                  color: const Color(0xFFC89FB9).withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8AD4FF), Color(0xFFB68CFF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Xoá lịch này?',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1D3557),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Xoá toàn bộ bộ thẻ đã gán cho ${DateFormat('dd/MM/yyyy').format(schedule.date)}. Thao tác này không thể hoàn tác.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: Color(0xFF5D738A),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.72),
+                        foregroundColor: const Color(0xFF1D3557),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: const Text('Hủy'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFE45757),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: const Text('Xoá lịch'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _deleteScheduledDay(schedule.date);
+    }
   }
 
   Future<void> _openDeckPickerForSelectedDay() async {
@@ -382,6 +570,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
+                        color: Color(0xFF1D3557),
                       ),
                     ),
                   ),
@@ -511,6 +700,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
                 FilledButton(
                   onPressed: () async {
+                    if (selected.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Hãy chọn ít nhất một bộ thẻ.'),
+                        ),
+                      );
+                      return;
+                    }
+                    if (selectedTime == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Hãy chọn giờ học cho lịch này.'),
+                        ),
+                      );
+                      return;
+                    }
                     await _saveSelectedDayDecks(
                       selected.toList(),
                       selectedTime: selectedTime,
@@ -595,6 +800,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
           date: date,
           decks: entry.value,
           time: _scheduledTimeByDay[entry.key],
+          styleIndex: _scheduledStyleByDay[entry.key] ??
+              _gradientIndexForKey(entry.key),
         ),
       );
     }
@@ -949,9 +1156,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 7,
-                              mainAxisSpacing: 6,
-                              crossAxisSpacing: 6,
-                              childAspectRatio: 1.05,
+                              mainAxisSpacing: 5,
+                              crossAxisSpacing: 5,
+                              childAspectRatio: 1.12,
                             ),
                         itemCount: gridCount,
                         itemBuilder: (context, index) {
@@ -1047,15 +1254,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                         Text(
                                           '$dayNum',
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                             color: beforeAppStart
                                                 ? const Color(0xFF98A6B8)
                                                 : const Color(0xFF1D3557),
                                           ),
                                         ),
-                                        const SizedBox(height: 1),
-                                        Icon(icon, size: 13, color: iconColor),
+                                        const SizedBox(height: 0),
+                                        Icon(icon, size: 12, color: iconColor),
                                       ],
                                     )
                                   : null,
@@ -1077,22 +1284,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              const Color(0xFFFFF5E9).withValues(alpha: 0.9),
-                              const Color(0xFFF7ECFF).withValues(alpha: 0.88),
-                              const Color(0xFFEAF6FF).withValues(alpha: 0.84),
+                              const Color(0xFFFFEFE0).withValues(alpha: 0.94),
+                              const Color(0xFFF8E7FF).withValues(alpha: 0.9),
+                              const Color(0xFFE7F4FF).withValues(alpha: 0.88),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: const Color(0xFFE7D6C1).withValues(alpha: 0.8),
+                            color: const Color(0xFFE4C8D5).withValues(alpha: 0.9),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFB79DB0).withValues(alpha: 0.12),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
+                              color: const Color(0xFFC89FB9).withValues(alpha: 0.2),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: const Color(0xFF7EA7C9).withValues(alpha: 0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
@@ -1257,31 +1469,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             final shortMonth = DateFormat('MM').format(
                               schedule.date,
                             );
+                            final scheduleGradient = _gradientForScheduleKey(
+                              _dateKey(schedule.date),
+                            );
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFFFFF3E8).withValues(alpha: 0.86),
-                                    const Color(0xFFFFEAF3).withValues(alpha: 0.8),
-                                    const Color.fromARGB(255, 238, 216, 249).withValues(alpha: 0.8),
-
-                                    const Color(0xFFEEF7FF).withValues(alpha: 0.78),
-                                  ],
-                                  stops: [0.0, 0.35, 0.7, 1.0],
+                                  colors: scheduleGradient
+                                      .map((color) => color.withValues(alpha: 0.86))
+                                      .toList(),
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: const Color(0xFFEBCFDD).withValues(alpha: 0.82),
+                                  color: scheduleGradient.first.withValues(alpha: 0.86),
+                                  width: 1.1,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFCFA5BC).withValues(alpha: 0.18),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 7),
+                                    color: scheduleGradient.last.withValues(alpha: 0.24),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 9),
+                                  ),
+                                  BoxShadow(
+                                    color: const Color(0xFF2B4A62).withValues(alpha: 0.08),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 3),
                                   ),
                                 ],
                               ),
@@ -1358,6 +1574,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.w700,
                                                   color: Color(0xFF1D3557),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              width: 30,
+                                              height: 30,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withValues(alpha: 0.82),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(
+                                                  color: const Color(0xFFE8D7DE),
+                                                ),
+                                              ),
+                                              child: IconButton(
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(),
+                                                iconSize: 16,
+                                                tooltip: 'Xoá lịch',
+                                                onPressed: () => _confirmDeleteScheduledDay(schedule),
+                                                icon: const Icon(
+                                                  Icons.delete_outline_rounded,
+                                                  color: Color(0xFFE45757),
                                                 ),
                                               ),
                                             ),
@@ -1500,11 +1739,13 @@ class _UpcomingSchedule {
   final DateTime date;
   final List<String> decks;
   final String? time;
+  final int styleIndex;
 
   const _UpcomingSchedule({
     required this.date,
     required this.decks,
     this.time,
+    this.styleIndex = 0,
   });
 }
 

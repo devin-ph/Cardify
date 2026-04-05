@@ -604,224 +604,428 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bộ sưu tập'),
-        backgroundColor: Colors.transparent,
-        foregroundColor: const Color(0xFF2E2140),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color.fromARGB(255, 251, 231, 248),
-              Color.fromARGB(255, 232, 238, 248),
-              Color.fromARGB(255, 244, 220, 226),
-              Color.fromARGB(255, 221, 231, 247),
-              Color.fromARGB(255, 217, 231, 234),
-              Color.fromARGB(255, 235, 219, 247),
+              Color(0xFFE9F4FF),
+              Color(0xFFDFF0FF),
+              Color(0xFFF4EBFF),
             ],
-            stops: [0.0, 0.2, 0.4,0.6, 0.7, 1.0],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: SafeArea(
-          child: ValueListenableBuilder<List<SavedCard>>(
-            valueListenable: _repository.cardsNotifier,
-            builder: (context, cards, _) {
-              final filteredCards = _filterCardsByVietnameseName(cards);
-              final recentCards = filteredCards.take(5).toList(growable: false);
+          child: Stack(
+            children: [
+              Positioned(
+                top: -24,
+                left: -40,
+                child: _AmbientBlob(
+                  size: 180,
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.16),
+                ),
+              ),
+              Positioned(
+                top: 140,
+                right: -40,
+                child: _AmbientBlob(
+                  size: 220,
+                  color: const Color(0xFFF472B6).withValues(alpha: 0.12),
+                ),
+              ),
+              ValueListenableBuilder<List<SavedCard>>(
+                valueListenable: _repository.cardsNotifier,
+                builder: (context, cards, _) {
+                  final filteredCards = _filterCardsByVietnameseName(cards);
+                  final recentCards = filteredCards.take(5).toList(growable: false);
 
-              return CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Container(
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          borderRadius: BorderRadius.circular(26),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          textInputAction: TextInputAction.search,
-                          onChanged: (_) => setState(() {}),
-                          style: const TextStyle(
-                            color: Color(0xFF3D2D53),
-                            fontSize: 16,
-                          ),
-                          decoration: const InputDecoration(
-                            hintText: 'Tìm kiếm thẻ đã lưu',
-                            hintStyle: TextStyle(
-                              color: Color(0xFF8D83A0),
-                              fontSize: 16,
-                            ),
-                            prefixIcon: Icon(
-                              Icons.search,
-                              color: Color(0xFF8D83A0),
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 14),
+                  return CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bộ sưu tập',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF1F2740),
+                                  fontFamily: 'Georgia',
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Danh sách từ vựng đã lưu của bạn',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF627485),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 26, 16, 10),
-                      child: const Text(
-                        'Thẻ đã lưu gần đây',
-                        style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF21162F),
-                          letterSpacing: 0.15,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 168,
-                      child: recentCards.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Chưa có dữ liệu gần đây',
-                                style: TextStyle(color: Color(0xFF7A6F8B)),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.78),
+                                  const Color(0xFFF7FBFF).withValues(alpha: 0.65),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.8),
                               ),
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              itemCount: recentCards.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, index) {
-                                final card = recentCards[index];
-                                return GestureDetector(
-                                  onTap: () => _openCardDetails(card),
-                                  child: SizedBox(
-                                    width: 122,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            28,
-                                          ),
-                                          child: Container(
-                                            width: 122,
-                                            height: 122,
-                                            color: Colors.white,
-                                            child: card.imageUrl != null
-                                                ? Image.network(
-                                                    card.imageUrl!,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, _, _) =>
-                                                        const Icon(
-                                                          Icons.broken_image,
-                                                          color:
-                                                              Colors.blueGrey,
-                                                        ),
-                                                  )
-                                                : card.imageBytes != null
-                                                ? Image.memory(
-                                                    card.imageBytes!,
-                                                    fit: BoxFit.cover,
-                                                  )
-                                                : const Icon(
-                                                    Icons.image_outlined,
-                                                    color: Colors.blueGrey,
-                                                  ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          card.word,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w400,
-                                            color: Color(0xFF2A1D3B),
-                                            letterSpacing: 0.1,
-                                          ),
-                                        ),
-                                      ],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF7EA7C9).withValues(alpha: 0.16),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  height: 54,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(
+                                      color: const Color(0xFFDDE8F2),
                                     ),
                                   ),
-                                );
-                              },
+                                  child: TextField(
+                                    controller: _searchController,
+                                    textInputAction: TextInputAction.search,
+                                    onChanged: (_) => setState(() {}),
+                                    style: const TextStyle(
+                                      color: Color(0xFF3D2D53),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'Tìm kiếm thẻ đã lưu',
+                                      hintStyle: const TextStyle(
+                                        color: Color(0xFF8D83A0),
+                                        fontSize: 16,
+                                      ),
+                                      prefixIcon: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: Container(
+                                          width: 38,
+                                          height: 38,
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFF8AD4FF),
+                                                Color(0xFFB68CFF),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(13),
+                                          ),
+                                          child: const Icon(
+                                            Icons.search_rounded,
+                                            color: Colors.white,
+                                            size: 22,
+                                          ),
+                                        ),
+                                      ),
+                                      prefixIconConstraints: const BoxConstraints(
+                                        minWidth: 54,
+                                        minHeight: 54,
+                                      ),
+                                      border: InputBorder.none,
+                                      contentPadding: EdgeInsets.symmetric(
+                                        vertical: 15,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 22, 16, 14),
-                      child: Text(
-                        'Bộ sưu tập ',
-                        style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black.withValues(alpha: 0.85),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  if (cards.isEmpty)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _CenteredMessage(
-                        message: 'Chưa có từ nào được lưu',
-                        icon: Icons.menu_book_outlined,
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
+                          child: Row(
+                            children: [
+                              const Text(
+                                'Thẻ đã lưu gần đây',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF21162F),
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${recentCards.length}/5',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF627485),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    )
-                  else if (filteredCards.isEmpty)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _CenteredMessage(
-                        message: 'Không tìm thấy thẻ từ phù hợp',
-                        icon: Icons.search_off,
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: 194,
+                          child: recentCards.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'Chưa có dữ liệu gần đây',
+                                    style: TextStyle(color: Color(0xFF7A6F8B)),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  scrollDirection: Axis.horizontal,
+                                  physics: const BouncingScrollPhysics(),
+                                  itemCount: recentCards.length,
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    final card = recentCards[index];
+                                    return GestureDetector(
+                                      onTap: () => _openCardDetails(card),
+                                      child: Container(
+                                        width: 142,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.78),
+                                          borderRadius: BorderRadius.circular(22),
+                                          border: Border.all(
+                                            color: Colors.white.withValues(alpha: 0.9),
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFF7EA7C9).withValues(alpha: 0.12),
+                                              blurRadius: 14,
+                                              offset: const Offset(0, 7),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            Expanded(
+                                              child: ClipRRect(
+                                                borderRadius: const BorderRadius.vertical(
+                                                  top: Radius.circular(22),
+                                                ),
+                                                child: Stack(
+                                                  fit: StackFit.expand,
+                                                  children: [
+                                                    card.imageUrl != null
+                                                        ? Image.network(
+                                                            card.imageUrl!,
+                                                            fit: BoxFit.cover,
+                                                            errorBuilder: (_, _, _) => Container(
+                                                              color: const Color(0xFFEAF3FE),
+                                                              child: const Icon(
+                                                                Icons.broken_image,
+                                                                color: Colors.blueGrey,
+                                                              ),
+                                                            ),
+                                                          )
+                                                        : card.imageBytes != null
+                                                            ? Image.memory(
+                                                                card.imageBytes!,
+                                                                fit: BoxFit.cover,
+                                                              )
+                                                            : Container(
+                                                                color: const Color(0xFFEAF3FE),
+                                                                child: const Icon(
+                                                                  Icons.image_outlined,
+                                                                  color: Colors.blueGrey,
+                                                                  size: 34,
+                                                                ),
+                                                              ),
+                                                    Align(
+                                                      alignment: Alignment.topLeft,
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.all(10),
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white.withValues(alpha: 0.88),
+                                                            borderRadius: BorderRadius.circular(999),
+                                                          ),
+                                                          child: Text(
+                                                            card.topic,
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: const TextStyle(
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.w700,
+                                                              color: Color(0xFF1D3557),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    card.word,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 17,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: Color(0xFF2A1D3B),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    card.meaning,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Color(0xFF627485),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
                       ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              childAspectRatio: 0.70,
-                            ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final card = filteredCards[index];
-                          return _DictionaryCardGridItem(
-                            card: card,
-                            onTap: () => _openCardDetails(card),
-                          );
-                        }, childCount: filteredCards.length),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 24, 16, 14),
+                          child: Row(
+                            children: [
+                              const Text(
+                                'Bộ sưu tập',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF21162F),
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  '${filteredCards.length} thẻ',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF516476),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                ],
-              );
-            },
+                      if (cards.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _CenteredMessage(
+                            message: 'Chưa có từ nào được lưu',
+                            icon: Icons.menu_book_outlined,
+                          ),
+                        )
+                      else if (filteredCards.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _CenteredMessage(
+                            message: 'Không tìm thấy thẻ từ phù hợp',
+                            icon: Icons.search_off,
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  childAspectRatio: 0.72,
+                                ),
+                            delegate: SliverChildBuilderDelegate((context, index) {
+                              final card = filteredCards[index];
+                              return _DictionaryCardGridItem(
+                                card: card,
+                                onTap: () => _openCardDetails(card),
+                              );
+                            }, childCount: filteredCards.length),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AmbientBlob extends StatelessWidget {
+  const _AmbientBlob({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
@@ -969,13 +1173,23 @@ class _DictionaryCardGridItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.blue[50],
-          borderRadius: BorderRadius.circular(14),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.92),
+              const Color(0xFFF6FAFF).withValues(alpha: 0.96),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: const Color(0xFF7EA7C9).withValues(alpha: 0.14),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -984,80 +1198,133 @@ class _DictionaryCardGridItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              flex: 4,
-              child: card.imageUrl != null
-                  ? Image.network(
-                      card.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Center(
-                        child: Icon(
-                          Icons.broken_image,
-                          size: 40,
-                          color: Colors.blueGrey,
+              flex: 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  card.imageUrl != null
+                      ? Image.network(
+                          card.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: const Color(0xFFEAF3FE),
+                            child: const Icon(
+                              Icons.broken_image,
+                              size: 40,
+                              color: Colors.blueGrey,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Color(0xFFEAF3FE),
+                                Color(0xFFF1ECFF),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.image,
+                            size: 42,
+                            color: Color(0xFF7A8FA5),
+                          ),
+                        ),
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.86),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          card.topic,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1D3557),
+                          ),
                         ),
                       ),
-                    )
-                  : Container(
-                      color: Colors.blue[100],
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.image,
-                        size: 40,
-                        color: Colors.blueGrey,
-                      ),
                     ),
+                  ),
+                ],
+              ),
             ),
             Expanded(
               flex: 5,
               child: Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      card.topic,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Column(
+                      children: [
+                        Text(
+                          card.word,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: Color(0xFF2A1D3B),
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          card.meaning,
+                          style: const TextStyle(
+                            color: Color(0xFF627485),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          card.phonetic.isNotEmpty ? card.phonetic : '...',
+                          style: const TextStyle(
+                            color: Color(0xFF8594A6),
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${card.word} : ${card.meaning}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF3FE),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      card.phonetic.isNotEmpty ? card.phonetic : '...',
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Align(
-                      alignment: Alignment.center,
                       child: IconButton(
-                        icon: const Icon(Icons.volume_up, color: Colors.blue),
+                        icon: const Icon(
+                          Icons.volume_up_rounded,
+                          color: Color(0xFF1D3557),
+                        ),
                         onPressed: _speakWord,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        iconSize: 24,
+                        iconSize: 18,
                       ),
                     ),
                   ],
