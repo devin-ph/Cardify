@@ -12,6 +12,7 @@ import '../models/saved_card.dart';
 import '../services/saved_cards_repository.dart';
 import '../services/firestore_sync_status.dart';
 import '../services/topic_classifier.dart';
+import '../services/vocabulary_service.dart';
 
 class DeckListScreen extends StatefulWidget {
   const DeckListScreen({super.key});
@@ -45,6 +46,42 @@ class _DeckListScreenState extends State<DeckListScreen> {
   int filterIndex = 0; // 0: All, 1: Recent, 2: Favorites
   bool _speechReady = false;
   bool _isListening = false;
+
+  Map<String, int> _normalizeTopicCounts(Map<String, int> raw) {
+    final normalized = <String, int>{};
+    for (final entry in raw.entries) {
+      final topic = TopicClassifier.normalizeTopic(entry.key);
+      if (topic.trim().isEmpty) {
+        continue;
+      }
+      normalized[topic] = (normalized[topic] ?? 0) + entry.value;
+    }
+    return normalized;
+  }
+
+  Map<String, int> _mergeTopicCounts(
+    Map<String, int> base,
+    Map<String, int> overlay,
+  ) {
+    final merged = <String, int>{...base};
+    for (final entry in overlay.entries) {
+      final current = merged[entry.key] ?? 0;
+      merged[entry.key] = entry.value > current ? entry.value : current;
+    }
+    return merged;
+  }
+
+  void _onHintsChanged() {
+    final liveCounts = _normalizeTopicCounts(
+      VocabularyService.instance.getTopicCounts(),
+    );
+    if (!mounted || liveCounts.isEmpty) {
+      return;
+    }
+    setState(() {
+      _hintsCountCache = _mergeTopicCounts(_hintsCountCache, liveCounts);
+    });
+  }
 
   final List<Map<String, dynamic>> decks = [
     {
@@ -113,15 +150,46 @@ class _DeckListScreenState extends State<DeckListScreen> {
   bool _matchesDeckByVocabulary(
     Map<String, dynamic> deck,
     String normalizedSearch,
+    List<SavedCard> cards,
   ) {
     if (normalizedSearch.isEmpty) {
       return true;
     }
 
-    final title = (deck['title'] as String).trim();
-    final vietnameseTitle = TopicClassifier.getVietnameseTopic(title);
-    final normalizedVietnameseTitle = _normalizeText(vietnameseTitle);
-    return normalizedVietnameseTitle.contains(normalizedSearch);
+    final title = deck['title'] as String;
+    final desc = deck['desc'] as String;
+    if (_normalizeText(title).contains(normalizedSearch) ||
+        _normalizeText(desc).contains(normalizedSearch)) {
+      return true;
+    }
+
+    final keywords = TopicClassifier.keywords[title] ?? const <String>[];
+    final keywordMatched = keywords.any(
+      (keyword) => _normalizeText(keyword).contains(normalizedSearch),
+    );
+    if (keywordMatched) {
+      return true;
+    }
+
+    // Fallback: classify the query itself and compare against this deck title.
+    final classifiedTopic = TopicClassifier.classifyWord(normalizedSearch, '');
+    if (classifiedTopic == title) {
+      return true;
+    }
+
+    final topicCards = cards.where(
+      (card) => TopicClassifier.normalizeTopic(card.topic) == title,
+    );
+    for (final card in topicCards) {
+      final searchableText = _normalizeText(
+        '${card.word} ${card.meaning} ${card.phonetic} ${card.example}',
+      );
+      if (searchableText.contains(normalizedSearch)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   void _showLockedTopicMessage() {
@@ -169,11 +237,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.lock_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      Icon(Icons.lock_rounded, color: Colors.white, size: 20),
                       SizedBox(width: 10),
                       Flexible(
                         child: Text(
@@ -211,6 +275,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
   void initState() {
     super.initState();
     _repository.watchCards();
+    VocabularyService.instance.hintsNotifier.addListener(_onHintsChanged);
     _loadRecentAccessHistory();
     _initSpeech();
     _loadHintCounts();
@@ -270,29 +335,50 @@ class _DeckListScreenState extends State<DeckListScreen> {
   }
 
   Future<void> _loadHintCounts() async {
+    final localCounts = _normalizeTopicCounts(await _loadHintCountsFromAsset());
+    Map<String, int> remoteCounts = <String, int>{};
+    try {
+      await VocabularyService.instance.loadHints();
+      remoteCounts = _normalizeTopicCounts(
+        VocabularyService.instance.getTopicCounts(),
+      );
+    } catch (_) {
+      // Ignore and use local fallback.
+    }
+
+    if (mounted) {
+      setState(() {
+        _hintsCountCache = _mergeTopicCounts(localCounts, remoteCounts);
+      });
+    }
+  }
+
+  Future<Map<String, int>> _loadHintCountsFromAsset() async {
     try {
       final raw = await rootBundle.loadString(
         'assets/data/vocabulary_hints_vi.json',
       );
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return;
+      if (decoded is! List) {
+        return <String, int>{};
+      }
 
       final counts = <String, int>{};
       for (final item in decoded) {
-        if (item is! Map) continue;
-        final meaning = item['meaning']?.toString() ?? '';
-        final topicOverride = item['topic']?.toString();
-        final actualTopic =
-            topicOverride ?? TopicClassifier.classifyWord(meaning, '');
-        counts[actualTopic] = (counts[actualTopic] ?? 0) + 1;
+        if (item is! Map) {
+          continue;
+        }
+        final rawTopic = item['topic']?.toString() ?? '';
+        final normalizedTopic = TopicClassifier.normalizeTopic(rawTopic);
+        if (normalizedTopic.trim().isEmpty) {
+          continue;
+        }
+        counts[normalizedTopic] = (counts[normalizedTopic] ?? 0) + 1;
       }
-
-      if (mounted) {
-        setState(() {
-          _hintsCountCache = counts;
-        });
-      }
-    } catch (_) {}
+      return counts;
+    } catch (_) {
+      return <String, int>{};
+    }
   }
 
   Future<void> _loadRecentAccessHistory() async {
@@ -613,6 +699,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
 
   @override
   void dispose() {
+    VocabularyService.instance.hintsNotifier.removeListener(_onHintsChanged);
     _lockedTopicMessageEntry?.remove();
     _speech.stop();
     _searchController.dispose();
@@ -624,9 +711,21 @@ class _DeckListScreenState extends State<DeckListScreen> {
     List<SavedCard> cards,
   ) {
     final imageAdded = _repository.imageCountForTopic(topic);
-    final totalInDataset =
-        _hintsCountCache[topic] ?? _defaultTotalCardsPerTopic;
-    final total = totalInDataset;
+    final topicKey = TopicClassifier.normalizeTopic(topic);
+    final totalInDataset = _hintsCountCache[topicKey] ?? 0;
+    final savedUniqueCount = cards
+        .where((card) => TopicClassifier.normalizeTopic(card.topic) == topicKey)
+        .map((card) => card.word.trim().toLowerCase())
+        .where((word) => word.isNotEmpty)
+        .toSet()
+        .length;
+    final total = totalInDataset > 0
+        ? (savedUniqueCount > totalInDataset
+              ? savedUniqueCount
+              : totalInDataset)
+        : (savedUniqueCount > 0
+              ? savedUniqueCount
+              : _defaultTotalCardsPerTopic);
     final progress = total == 0 ? 0.0 : (imageAdded / total).clamp(0.0, 1.0);
     return (imageAdded: imageAdded, total: total, progress: progress);
   }
@@ -652,7 +751,11 @@ class _DeckListScreenState extends State<DeckListScreen> {
                   }
                   if (filterIndex != 1 &&
                       normalizedSearch.isNotEmpty &&
-                      !_matchesDeckByVocabulary(deck, normalizedSearch)) {
+                      !_matchesDeckByVocabulary(
+                        deck,
+                        normalizedSearch,
+                        cards,
+                      )) {
                     return false;
                   }
                   return true;
@@ -692,6 +795,106 @@ class _DeckListScreenState extends State<DeckListScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withValues(alpha: 0.78),
+                                const Color(0xFFF8FBFF).withValues(alpha: 0.72),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF7EA7C9,
+                                ).withValues(alpha: 0.14),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF8AD4FF),
+                                      Color(0xFFB68CFF),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Icon(
+                                  Icons.view_agenda_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Bộ thẻ học',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: const Color(0xFF1F2740),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${filteredDecks.length} chủ đề đang hiển thị',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF627485),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFEAF3FE,
+                                  ).withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: const Text(
+                                  'AI English Learning',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1D3557),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                       if (filterIndex != 1)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
@@ -993,9 +1196,7 @@ class _DeckListScreenState extends State<DeckListScreen> {
             opacity: isLocked ? 0.52 : 1.0,
             child: InkWell(
               borderRadius: BorderRadius.circular(24),
-              onTap: isLocked
-                  ? _showLockedTopicMessage
-                  : onTap,
+              onTap: isLocked ? _showLockedTopicMessage : onTap,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(

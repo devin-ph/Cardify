@@ -6,6 +6,7 @@ import '../services/topic_classifier.dart';
 
 class SavedCard {
   final String id;
+  final String vocabularyId;
   final String topic;
   final String word;
   final String phonetic;
@@ -18,6 +19,7 @@ class SavedCard {
 
   SavedCard({
     required this.id,
+    required this.vocabularyId,
     required this.topic,
     required this.word,
     required this.phonetic,
@@ -31,6 +33,7 @@ class SavedCard {
 
   factory SavedCard.fromAnalysisResult(
     AnalysisResult result,
+    String vocabularyId,
     Uint8List? bytes, {
     String? remoteUrl,
     DateTime? timestamp,
@@ -38,6 +41,7 @@ class SavedCard {
     final now = timestamp ?? DateTime.now();
     return SavedCard(
       id: result.normalizedWord,
+      vocabularyId: vocabularyId,
       topic: TopicClassifier.toVietnameseCanonical(result.topic),
       word: result.word,
       phonetic: result.phonetic,
@@ -51,7 +55,7 @@ class SavedCard {
   }
 
   factory SavedCard.fromMap(Map<String, dynamic> data) {
-    final savedAtRaw = data['saved_at'];
+    final savedAtRaw = data['created_at'];
     DateTime timestamp;
     if (savedAtRaw is String) {
       timestamp = DateTime.tryParse(savedAtRaw) ?? DateTime.now();
@@ -80,6 +84,7 @@ class SavedCard {
       id: normalizedId.isEmpty
           ? DateTime.now().millisecondsSinceEpoch.toString()
           : normalizedId,
+      vocabularyId: data['vocabulary_id']?.toString() ?? '',
       topic: TopicClassifier.toVietnameseCanonical(
         data['topic']?.toString() ?? 'Chung',
       ),

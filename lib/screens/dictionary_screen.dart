@@ -455,6 +455,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                   // Update the current card reference silently or just let the repository stream handle UI
                                   card = SavedCard(
                                     id: card.id,
+                                    vocabularyId: card.vocabularyId,
                                     topic: card.topic,
                                     word: card.word,
                                     phonetic: card.phonetic,
@@ -613,9 +614,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               Color(0xFFFFF4FA),
               Color(0xFFE4FAEF),
               Color(0xFFF3E5FF),
-
             ],
-            stops: [0.0, 0.3, 0.6,0.8, 1.0],
+            stops: [0.0, 0.3, 0.6, 0.8, 1.0],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -645,7 +645,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 valueListenable: _repository.cardsNotifier,
                 builder: (context, cards, _) {
                   final filteredCards = _filterCardsByVietnameseName(cards);
-                  final recentCards = filteredCards.take(5).toList(growable: false);
+                  final recentCards = filteredCards
+                      .take(5)
+                      .toList(growable: false);
 
                   return CustomScrollView(
                     slivers: [
@@ -685,8 +687,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  const Color.fromARGB(255, 210, 203, 245).withValues(alpha: 0.78),
-                                  const Color.fromARGB(255, 203, 223, 244).withValues(alpha: 0.65),
+                                  const Color.fromARGB(
+                                    255,
+                                    210,
+                                    203,
+                                    245,
+                                  ).withValues(alpha: 0.78),
+                                  const Color.fromARGB(
+                                    255,
+                                    203,
+                                    223,
+                                    244,
+                                  ).withValues(alpha: 0.65),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -697,7 +709,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF7EA7C9).withValues(alpha: 0.16),
+                                  color: const Color(
+                                    0xFF7EA7C9,
+                                  ).withValues(alpha: 0.16),
                                   blurRadius: 16,
                                   offset: const Offset(0, 8),
                                 ),
@@ -738,13 +752,25 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                           decoration: BoxDecoration(
                                             gradient: const LinearGradient(
                                               colors: [
-                                                Color.fromARGB(255, 199, 221, 234),
-                                                Color.fromARGB(255, 212, 198, 237),
+                                                Color.fromARGB(
+                                                  255,
+                                                  199,
+                                                  221,
+                                                  234,
+                                                ),
+                                                Color.fromARGB(
+                                                  255,
+                                                  212,
+                                                  198,
+                                                  237,
+                                                ),
                                               ],
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
                                             ),
-                                            borderRadius: BorderRadius.circular(13),
+                                            borderRadius: BorderRadius.circular(
+                                              13,
+                                            ),
                                           ),
                                           child: const Icon(
                                             Icons.search_rounded,
@@ -753,10 +779,11 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                           ),
                                         ),
                                       ),
-                                      prefixIconConstraints: const BoxConstraints(
-                                        minWidth: 54,
-                                        minHeight: 54,
-                                      ),
+                                      prefixIconConstraints:
+                                          const BoxConstraints(
+                                            minWidth: 54,
+                                            minHeight: 54,
+                                          ),
                                       border: InputBorder.none,
                                       contentPadding: EdgeInsets.symmetric(
                                         vertical: 15,
@@ -813,7 +840,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                       child: SizedBox(
                                         width: 142,
                                         child: _GlassCard(
-                                          borderRadius: BorderRadius.circular(22),
+                                          borderRadius: BorderRadius.circular(
+                                            22,
+                                          ),
                                           boxShadows: [
                                             BoxShadow(
                                               color: const Color(
@@ -838,7 +867,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                                 child: ClipRRect(
                                                   borderRadius:
                                                       const BorderRadius.vertical(
-                                                        top: Radius.circular(22),
+                                                        top: Radius.circular(
+                                                          22,
+                                                        ),
                                                       ),
                                                   child: Stack(
                                                     fit: StackFit.expand,
@@ -847,18 +878,18 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                                           ? Image.network(
                                                               card.imageUrl!,
                                                               fit: BoxFit.cover,
-                                                              errorBuilder:
-                                                                  (_, _, _) =>
-                                                                      Container(
-                                                                        color: const Color(
-                                                                          0xFFEAF3FE,
-                                                                        ),
-                                                                        child:
-                                                                            const Icon(
-                                                                              Icons.broken_image,
-                                                                              color: Colors.blueGrey,
-                                                                            ),
-                                                                      ),
+                                                              errorBuilder: (_, _, _) => Container(
+                                                                color:
+                                                                    const Color(
+                                                                      0xFFEAF3FE,
+                                                                    ),
+                                                                child: const Icon(
+                                                                  Icons
+                                                                      .broken_image,
+                                                                  color: Colors
+                                                                      .blueGrey,
+                                                                ),
+                                                              ),
                                                             )
                                                           : card.imageBytes !=
                                                                 null
@@ -867,14 +898,15 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                                               fit: BoxFit.cover,
                                                             )
                                                           : Container(
-                                                              color: const Color(
-                                                                0xFFEAF3FE,
-                                                              ),
+                                                              color:
+                                                                  const Color(
+                                                                    0xFFEAF3FE,
+                                                                  ),
                                                               child: const Icon(
                                                                 Icons
                                                                     .image_outlined,
-                                                                color:
-                                                                    Colors.blueGrey,
+                                                                color: Colors
+                                                                    .blueGrey,
                                                                 size: 34,
                                                               ),
                                                             ),
@@ -892,36 +924,32 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                                                   horizontal: 8,
                                                                   vertical: 4,
                                                                 ),
-                                                            decoration:
-                                                                BoxDecoration(
-                                                                  color: Colors
-                                                                      .white
-                                                                      .withValues(
-                                                                        alpha:
-                                                                            0.68,
-                                                                      ),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        999,
-                                                                      ),
-                                                                ),
+                                                            decoration: BoxDecoration(
+                                                              color: Colors
+                                                                  .white
+                                                                  .withValues(
+                                                                    alpha: 0.68,
+                                                                  ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    999,
+                                                                  ),
+                                                            ),
                                                             child: Text(
                                                               card.topic,
                                                               maxLines: 1,
                                                               overflow:
                                                                   TextOverflow
                                                                       .ellipsis,
-                                                              style:
-                                                                  const TextStyle(
-                                                                    fontSize:
-                                                                        10,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w700,
-                                                                    color: Color(
-                                                                      0xFF1D3557,
-                                                                    ),
-                                                                  ),
+                                                              style: const TextStyle(
+                                                                fontSize: 10,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color: Color(
+                                                                  0xFF1D3557,
+                                                                ),
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
@@ -945,8 +973,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                                     Text(
                                                       card.word,
                                                       maxLines: 1,
-                                                      overflow: TextOverflow
-                                                          .ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                       style: const TextStyle(
                                                         fontSize: 17,
                                                         fontWeight:
@@ -960,8 +988,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                                     Text(
                                                       card.meaning,
                                                       maxLines: 1,
-                                                      overflow: TextOverflow
-                                                          .ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                       style: const TextStyle(
                                                         fontSize: 12,
                                                         color: Color(
@@ -1044,7 +1072,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                                   mainAxisSpacing: 12,
                                   childAspectRatio: 0.72,
                                 ),
-                            delegate: SliverChildBuilderDelegate((context, index) {
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
                               final card = filteredCards[index];
                               return _DictionaryCardGridItem(
                                 card: card,
@@ -1268,10 +1299,7 @@ class _DictionaryCardGridItem extends StatelessWidget {
                       : Container(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [
-                                Color(0xFFEAF3FE),
-                                Color(0xFFF1ECFF),
-                              ],
+                              colors: [Color(0xFFEAF3FE), Color(0xFFF1ECFF)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -1407,10 +1435,7 @@ class _GlassCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: borderRadius,
-          border: Border.all(
-            color: const Color(0xFFE2E8F0),
-            width: 1.0,
-          ),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
           boxShadow: boxShadows,
         ),
         child: child,

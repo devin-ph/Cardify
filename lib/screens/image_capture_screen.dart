@@ -36,6 +36,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
   bool _isAnalyzing = false;
   bool _isSwitchingCamera = false;
   bool _dialogVisible = false;
+  bool _exitAfterDeclineReplace = false;
   double _minZoomLevel = 1.0;
   double _maxZoomLevel = 1.0;
   double _currentZoomLevel = 1.0;
@@ -337,6 +338,13 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
                   Navigator.of(dialogContext).pop();
                   _dialogVisible = false;
                   _navigateToDictionary();
+                } else if (_exitAfterDeclineReplace) {
+                  _exitAfterDeclineReplace = false;
+                  Navigator.of(dialogContext).pop();
+                  _dialogVisible = false;
+                  if (mounted) {
+                    Navigator.of(context).maybePop();
+                  }
                 }
               },
               onSpeak: () => _speakWord(result.word),
@@ -365,6 +373,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
 
   Future<bool> _handleSave(AnalysisResult result) async {
     try {
+      _exitAfterDeclineReplace = false;
       final existingWord = await _cardsRepository.findExistingWord(
         result.normalizedWord,
       );
@@ -375,6 +384,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
         }
         final shouldReplace = await _showReplaceImageDialog(result.word);
         if (!shouldReplace) {
+          _exitAfterDeclineReplace = true;
           return false;
         }
 
@@ -652,7 +662,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
             opacity: _isAnalyzing ? 1 : 0.0,
             duration: const Duration(milliseconds: 250),
             child: const Text(
-              'Đang gửi ảnh cho AI trên Hugging Face...',
+              'Đang quét để phân tích hình ảnh ...',
               style: TextStyle(color: Colors.white70),
             ),
           ),
