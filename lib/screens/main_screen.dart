@@ -26,8 +26,6 @@ class _MainScreenState extends State<MainScreen> {
   String _userName = 'Explorer';
   bool _pushReminderEnabled = true;
   bool _autoPlayPronunciation = true;
-  bool _aiHintsEnabled = true;
-  bool _compactLayoutEnabled = false;
 
   @override
   void initState() {
@@ -156,15 +154,6 @@ class _MainScreenState extends State<MainScreen> {
                       title: 'Học tập',
                       children: [
                         _SettingsSwitchTile(
-                          icon: Icons.auto_awesome_rounded,
-                          label: 'Gợi ý AI theo ngữ cảnh',
-                          value: _aiHintsEnabled,
-                          onChanged: (value) {
-                            setSheetState(() => _aiHintsEnabled = value);
-                            setState(() => _aiHintsEnabled = value);
-                          },
-                        ),
-                        _SettingsSwitchTile(
                           icon: Icons.record_voice_over_rounded,
                           label: 'Tự động phát phát âm',
                           value: _autoPlayPronunciation,
@@ -187,15 +176,6 @@ class _MainScreenState extends State<MainScreen> {
                           onChanged: (value) {
                             setSheetState(() => _pushReminderEnabled = value);
                             setState(() => _pushReminderEnabled = value);
-                          },
-                        ),
-                        _SettingsSwitchTile(
-                          icon: Icons.view_compact_rounded,
-                          label: 'Bố cục cô đọng',
-                          value: _compactLayoutEnabled,
-                          onChanged: (value) {
-                            setSheetState(() => _compactLayoutEnabled = value);
-                            setState(() => _compactLayoutEnabled = value);
                           },
                         ),
                       ],

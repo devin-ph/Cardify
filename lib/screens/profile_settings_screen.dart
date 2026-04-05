@@ -24,22 +24,18 @@ class ProfileSettingsScreen extends StatefulWidget {
 class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   static const String _nameKey = 'profile_settings_name';
   static const String _avatarKey = 'profile_settings_avatar_base64';
-  static const String _aiHintsKey = 'profile_settings_ai_hints_enabled';
   static const String _autoPlayKey = 'profile_settings_auto_play_enabled';
   static const String _aiChatNarratorKey =
       'profile_settings_ai_chat_narrator_enabled';
   static const String _dailyReminderKey = 'profile_settings_daily_reminder';
-  static const String _compactLayoutKey = 'profile_settings_compact_layout';
 
   final ImagePicker _imagePicker = ImagePicker();
   late String _name;
   late String _email;
   Uint8List? _avatarBytes;
-  bool _aiHintsEnabled = true;
   bool _autoPlayPronunciation = true;
   bool _aiChatNarratorEnabled = true;
   bool _dailyReminderEnabled = true;
-  bool _compactLayoutEnabled = false;
 
   @override
   void initState() {
@@ -53,11 +49,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     final persistedName = prefs.getString(_nameKey);
     final persistedAvatarBase64 = prefs.getString(_avatarKey);
-    final persistedAiHints = prefs.getBool(_aiHintsKey);
     final persistedAutoPlay = prefs.getBool(_autoPlayKey);
     final persistedAiChatNarrator = prefs.getBool(_aiChatNarratorKey);
     final persistedReminder = prefs.getBool(_dailyReminderKey);
-    final persistedCompactLayout = prefs.getBool(_compactLayoutKey);
 
     Uint8List? restoredAvatar;
     if (persistedAvatarBase64 != null && persistedAvatarBase64.isNotEmpty) {
@@ -77,23 +71,19 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           ? persistedName.trim()
           : _name;
       _avatarBytes = restoredAvatar;
-      _aiHintsEnabled = persistedAiHints ?? _aiHintsEnabled;
       _autoPlayPronunciation = persistedAutoPlay ?? _autoPlayPronunciation;
       _aiChatNarratorEnabled =
           persistedAiChatNarrator ?? _aiChatNarratorEnabled;
       _dailyReminderEnabled = persistedReminder ?? _dailyReminderEnabled;
-      _compactLayoutEnabled = persistedCompactLayout ?? _compactLayoutEnabled;
     });
   }
 
   Future<void> _persistSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_nameKey, _name);
-    await prefs.setBool(_aiHintsKey, _aiHintsEnabled);
     await prefs.setBool(_autoPlayKey, _autoPlayPronunciation);
     await prefs.setBool(_aiChatNarratorKey, _aiChatNarratorEnabled);
     await prefs.setBool(_dailyReminderKey, _dailyReminderEnabled);
-    await prefs.setBool(_compactLayoutKey, _compactLayoutEnabled);
 
     if (_avatarBytes == null || _avatarBytes!.isEmpty) {
       await prefs.remove(_avatarKey);
@@ -523,18 +513,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 title: 'Học tập với AI',
                 children: [
                   SwitchListTile(
-                    value: _aiHintsEnabled,
-                    onChanged: (value) {
-                      setState(() => _aiHintsEnabled = value);
-                      _persistSettings();
-                    },
-                    title: const Text('Gợi ý AI theo ngữ cảnh'),
-                    subtitle: const Text(
-                      'Hiện gợi ý từ vựng và cách dùng phù hợp',
-                    ),
-                    secondary: const Icon(Icons.auto_awesome_rounded),
-                  ),
-                  SwitchListTile(
                     value: _autoPlayPronunciation,
                     onChanged: (value) {
                       setState(() => _autoPlayPronunciation = value);
@@ -573,16 +551,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                       'Thông báo theo giờ học bạn thường dùng',
                     ),
                     secondary: const Icon(Icons.notifications_active_rounded),
-                  ),
-                  SwitchListTile(
-                    value: _compactLayoutEnabled,
-                    onChanged: (value) {
-                      setState(() => _compactLayoutEnabled = value);
-                      _persistSettings();
-                    },
-                    title: const Text('Bố cục cô đọng'),
-                    subtitle: const Text('Tối ưu màn hình nhỏ và học nhanh'),
-                    secondary: const Icon(Icons.view_compact_rounded),
                   ),
                 ],
               ),
