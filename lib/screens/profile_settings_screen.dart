@@ -13,11 +13,13 @@ import '../services/firestore_sync_status.dart';
 class ProfileSettingsScreen extends StatefulWidget {
   final String name;
   final String email;
+  final String userSocialId;
 
   const ProfileSettingsScreen({
     super.key,
     required this.name,
     required this.email,
+    required this.userSocialId,
   });
 
   @override
@@ -37,6 +39,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   late String _name;
   late String _email;
+  late String _userSocialId;
   Uint8List? _avatarBytes;
   bool _aiHintsEnabled = true;
   bool _autoPlayPronunciation = true;
@@ -51,6 +54,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     super.initState();
     _name = widget.name;
     _email = widget.email;
+    _userSocialId = widget.userSocialId;
     _loadPersistedSettings();
   }
 
@@ -156,6 +160,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
       final remoteName = data['display_name']?.toString().trim();
       final remoteAvatarBase64 = data['avatar_base64']?.toString().trim();
+      final remoteSocialId = data['social_id']?.toString().trim();
       final remoteAiHints = data['settings_ai_hints_enabled'];
       final remoteAutoPlay = data['settings_auto_play_enabled'];
       final remoteNarrator = data['settings_ai_chat_narrator_enabled'];
@@ -178,6 +183,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       setState(() {
         if (remoteName != null && remoteName.isNotEmpty) {
           _name = remoteName;
+        }
+        if (remoteSocialId != null && remoteSocialId.isNotEmpty) {
+          _userSocialId = remoteSocialId;
         }
         _avatarBytes = remoteAvatarBytes ?? _avatarBytes;
         if (remoteAiHints is bool) {
@@ -645,6 +653,16 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                           Text(
                             _email,
                             style: const TextStyle(color: Color(0xFF4F617B)),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _userSocialId.trim().isEmpty
+                                ? 'ID: Đang tạo...'
+                                : 'ID: $_userSocialId',
+                            style: const TextStyle(
+                              color: Color(0xFF4F617B),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),

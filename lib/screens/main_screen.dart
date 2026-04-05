@@ -45,6 +45,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _isDictionarySearching = false;
   String _userName = 'Explorer';
   String _userEmail = 'explorer@cardify.ai';
+  String _socialId = '';
   int _streak = 0;
   int _experience = 0;
   int _level = 1;
@@ -62,6 +63,12 @@ class _MainScreenState extends State<MainScreen> {
   Timer? _dueStudyCheckTimer;
   bool _isDueStudyDialogVisible = false;
   bool _isLaunchingDueDeck = false;
+  bool _isFriendsPanelOpen = false;
+  bool _isSearchingFriend = false;
+  bool _isEnsuringSocialId = false;
+  String? _friendSearchError;
+  final TextEditingController _friendIdController = TextEditingController();
+  List<Map<String, dynamic>> _friends = <Map<String, dynamic>>[];
 
   @override
   void initState() {
@@ -104,6 +111,8 @@ class _MainScreenState extends State<MainScreen> {
       _profileSubscription?.cancel();
       _profileSubscription = null;
       _boundProfileUid = null;
+      _socialId = '';
+      _friends = <Map<String, dynamic>>[];
       return;
     }
 
@@ -113,6 +122,11 @@ class _MainScreenState extends State<MainScreen> {
 
     _profileSubscription?.cancel();
     _boundProfileUid = user.uid;
+    _socialId = '';
+    _friends = <Map<String, dynamic>>[];
+
+    // Ensure new users (or legacy users missing social_id) get one as soon as they sign in.
+    unawaited(_ensureSocialIdForCurrentUser(uid: user.uid));
 
     FirestoreSyncStatus.instance.reportReading(
       path: 'users/${user.uid}',
@@ -126,6 +140,7 @@ class _MainScreenState extends State<MainScreen> {
         .listen(
           (snapshot) {
             if (!snapshot.exists) {
+              unawaited(_ensureSocialIdForCurrentUser(uid: user.uid));
               return;
             }
             final data = snapshot.data() ?? <String, dynamic>{};
@@ -141,6 +156,7 @@ class _MainScreenState extends State<MainScreen> {
               _userEmail = data['email']?.toString().trim().isNotEmpty == true
                   ? data['email'].toString().trim()
                   : (user.email ?? _userEmail);
+              _socialId = data['social_id']?.toString().trim() ?? '';
               _streak = (data['streak'] as num?)?.toInt() ?? _streak;
               _experience = (data['xp'] as num?)?.toInt() ?? _experience;
               _level = (data['level'] as num?)?.toInt() ?? _level;
@@ -160,7 +176,13 @@ class _MainScreenState extends State<MainScreen> {
               } else {
                 _userAvatarBytes = null;
               }
+
+              _friends = _parseFriends(data['friends']);
             });
+
+            if (_socialId.trim().isEmpty) {
+              unawaited(_ensureSocialIdForCurrentUser(uid: user.uid));
+            }
 
             FirestoreSyncStatus.instance.reportSuccess(
               path: 'users/${user.uid}',
@@ -179,10 +201,462 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    _friendIdController.dispose();
     _dueStudyCheckTimer?.cancel();
     _profileSubscription?.cancel();
     _authSubscription?.cancel();
     super.dispose();
+  }
+
+  DocumentReference<Map<String, dynamic>>? _profileDocRef() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return FirebaseFirestore.instance.collection('users').doc(user.uid);
+  }
+
+  List<Map<String, dynamic>> _parseFriends(dynamic raw) {
+    if (raw is! List) {
+      return <Map<String, dynamic>>[];
+    }
+
+    final dedupByUid = <String>{};
+    final parsed = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      if (item is! Map) {
+        continue;
+      }
+      final uid = item['uid']?.toString().trim() ?? '';
+      final friendId = item['social_id']?.toString().trim() ?? '';
+      if (uid.isEmpty || friendId.isEmpty || dedupByUid.contains(uid)) {
+        continue;
+      }
+      dedupByUid.add(uid);
+      parsed.add(<String, dynamic>{
+        'uid': uid,
+        'social_id': friendId,
+        'display_name': item['display_name']?.toString().trim() ?? '',
+        'email': item['email']?.toString().trim() ?? '',
+        'avatar_base64': item['avatar_base64']?.toString().trim() ?? '',
+      });
+    }
+
+    parsed.sort((a, b) {
+      final nameA = (a['display_name']?.toString().trim().isNotEmpty == true)
+          ? a['display_name'].toString().trim()
+          : a['social_id'].toString();
+      final nameB = (b['display_name']?.toString().trim().isNotEmpty == true)
+          ? b['display_name'].toString().trim()
+          : b['social_id'].toString();
+      return nameA.toLowerCase().compareTo(nameB.toLowerCase());
+    });
+
+    return parsed;
+  }
+
+  String _stableSocialIdFromUid(String uid) {
+    final cleaned = uid.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    if (cleaned.isEmpty) {
+      return 'CFUNKNOWN';
+    }
+    final body = cleaned.length >= 8
+        ? cleaned.substring(0, 8)
+        : cleaned.padRight(8, 'X');
+    return 'CF$body';
+  }
+
+  Future<void> _ensureSocialIdForCurrentUser({required String uid}) async {
+    if (_isEnsuringSocialId) {
+      return;
+    }
+    _isEnsuringSocialId = true;
+    try {
+      final users = FirebaseFirestore.instance.collection('users');
+      final userDocRef = users.doc(uid);
+      final userSnap = await userDocRef.get();
+      final existingSocialId =
+          userSnap.data()?['social_id']?.toString().trim() ?? '';
+      if (existingSocialId.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _socialId = existingSocialId;
+          });
+        } else {
+          _socialId = existingSocialId;
+        }
+        return;
+      }
+
+      final assigned = _stableSocialIdFromUid(uid);
+
+      await userDocRef.set({
+        'social_id': assigned,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _socialId = assigned ?? _socialId;
+      });
+    } catch (error) {
+      FirestoreSyncStatus.instance.reportError(
+        path: 'users/$uid',
+        operation: 'ensure social_id',
+        error: error,
+      );
+    } finally {
+      _isEnsuringSocialId = false;
+    }
+  }
+
+  void _toggleFriendsPanel() {
+    setState(() {
+      _isFriendsPanelOpen = !_isFriendsPanelOpen;
+    });
+  }
+
+  void _closeFriendsPanel() {
+    if (!_isFriendsPanelOpen) {
+      return;
+    }
+    setState(() {
+      _isFriendsPanelOpen = false;
+    });
+  }
+
+  Future<void> _searchAndAddFriendById() async {
+    final myDocRef = _profileDocRef();
+    final myUser = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (myDocRef == null || myUser == null) {
+      return;
+    }
+
+    final queryId = _friendIdController.text.trim().toUpperCase();
+    if (queryId.isEmpty) {
+      setState(() {
+        _friendSearchError = 'Vui lòng nhập ID bạn bè.';
+      });
+      return;
+    }
+
+    setState(() {
+      _friendSearchError = null;
+    });
+
+    if (queryId == _socialId.trim().toUpperCase()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể tự kết bạn với chính mình.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSearchingFriend = true;
+    });
+    try {
+      final result = await FirebaseFirestore.instance
+          .collection('users')
+          .where('social_id', isEqualTo: queryId)
+          .limit(1)
+          .get();
+
+      if (result.docs.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _friendSearchError = 'Không tìm thấy ID.';
+          });
+        }
+        return;
+      }
+
+      final friendDoc = result.docs.first;
+      if (friendDoc.id == myUser.uid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể tự kết bạn với chính mình.')),
+        );
+        return;
+      }
+
+      final existing = _friends.any(
+        (friend) => friend['uid']?.toString().trim() == friendDoc.id,
+      );
+      if (existing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Người này đã có trong danh sách bạn bè.')),
+        );
+        return;
+      }
+
+      final data = friendDoc.data();
+      final updatedFriends = <Map<String, dynamic>>[
+        ..._friends,
+        <String, dynamic>{
+          'uid': friendDoc.id,
+          'social_id': data['social_id']?.toString().trim() ?? queryId,
+          'display_name': data['display_name']?.toString().trim() ?? '',
+          'email': data['email']?.toString().trim() ?? '',
+          'avatar_base64': data['avatar_base64']?.toString().trim() ?? '',
+        },
+      ];
+
+      await myDocRef.set({
+        'friends': updatedFriends,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _friends = _parseFriends(updatedFriends);
+        _friendIdController.clear();
+        _friendSearchError = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã thêm bạn bè thành công.')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể thêm bạn bè. Vui lòng thử lại.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearchingFriend = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildFriendsPanel(BuildContext context) {
+    final panelWidth = MediaQuery.of(context).size.width * 0.75;
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      left: _isFriendsPanelOpen ? 0 : -panelWidth - 24,
+      top: 0,
+      bottom: 0,
+      width: panelWidth,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDFEFF),
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(24),
+              bottomRight: Radius.circular(24),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.14),
+                blurRadius: 18,
+                offset: const Offset(4, 0),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 12, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Bạn bè',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1F2740),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _closeFriendsPanel,
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Đóng',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _socialId.trim().isEmpty
+                              ? 'ID của bạn: Đang tạo...'
+                              : 'ID của bạn: $_socialId',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4A6077),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Copy ID',
+                        onPressed: _socialId.trim().isEmpty
+                            ? null
+                            : () async {
+                                await Clipboard.setData(
+                                  ClipboardData(text: _socialId.trim()),
+                                );
+                                if (!mounted) {
+                                  return;
+                                }
+                                await HapticFeedback.selectionClick();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Đã copy ID của bạn.'),
+                                  ),
+                                );
+                              },
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                        visualDensity: const VisualDensity(
+                          horizontal: -2,
+                          vertical: -2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _friendIdController,
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (_) {
+                            if (_friendSearchError != null) {
+                              setState(() {
+                                _friendSearchError = null;
+                              });
+                            }
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Nhập ID bạn bè',
+                            errorText: _friendSearchError,
+                            isDense: true,
+                            filled: true,
+                            fillColor: const Color(0xFFF2F6FD),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _isSearchingFriend
+                            ? null
+                            : _searchAndAddFriendById,
+                        icon: _isSearchingFriend
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.search_rounded, size: 18),
+                        label: const Text('Tìm'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Danh sách bạn bè',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1F2740),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _friends.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'Chưa có bạn bè nào.',
+                              style: TextStyle(color: Color(0xFF6A7486)),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: _friends.length,
+                            separatorBuilder: (_, _) => const Divider(
+                              height: 10,
+                              color: Color(0xFFE7EEF8),
+                            ),
+                            itemBuilder: (context, index) {
+                              final friend = _friends[index];
+                              final displayName =
+                                  friend['display_name']?.toString().trim() ?? '';
+                              final avatarBase64 =
+                                  friend['avatar_base64']?.toString().trim() ?? '';
+                              Uint8List? avatarBytes;
+                              if (avatarBase64.isNotEmpty) {
+                                try {
+                                  avatarBytes = base64Decode(avatarBase64);
+                                } catch (_) {
+                                  avatarBytes = null;
+                                }
+                              }
+
+                              return ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 2,
+                                ),
+                                leading: CircleAvatar(
+                                  backgroundColor: const Color(0xFFE9EEFF),
+                                  backgroundImage: avatarBytes != null
+                                      ? MemoryImage(avatarBytes)
+                                      : null,
+                                  child: avatarBytes == null
+                                      ? Text(
+                                          displayName.isNotEmpty
+                                              ? displayName[0].toUpperCase()
+                                              : 'U',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF344B72),
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                title: Text(
+                                  displayName.isNotEmpty
+                                      ? displayName
+                                      : friend['social_id'].toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(
+                                  'ID: ${friend['social_id']}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   String _dateKey(DateTime date) {
@@ -540,7 +1014,11 @@ class _MainScreenState extends State<MainScreen> {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
         builder: (context) =>
-            ProfileSettingsScreen(name: _userName, email: _userEmail),
+            ProfileSettingsScreen(
+              name: _userName,
+              email: _userEmail,
+              userSocialId: _socialId,
+            ),
       ),
     );
 
@@ -753,6 +1231,11 @@ class _MainScreenState extends State<MainScreen> {
     final mainContent = Scaffold(
       appBar: AppBar(
         toolbarHeight: 72,
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          tooltip: 'Bạn bè',
+          onPressed: _toggleFriendsPanel,
+        ),
         title: const Text('Cardify'),
         titleTextStyle: const TextStyle(
           fontWeight: FontWeight.w800,
@@ -843,6 +1326,14 @@ class _MainScreenState extends State<MainScreen> {
     return Stack(
       children: [
         RepaintBoundary(child: mainContent),
+        if (_isFriendsPanelOpen)
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _closeFriendsPanel,
+              child: Container(color: Colors.black.withValues(alpha: 0.28)),
+            ),
+          ),
+        _buildFriendsPanel(context),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 900),
           switchInCurve: Curves.easeOutCubic,

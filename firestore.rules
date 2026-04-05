@@ -10,7 +10,9 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      // Allow signed-in users to look up friend profiles by social_id.
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
 
       match /learning_state/{stateId} {
         allow read, write: if isOwner(uid);
