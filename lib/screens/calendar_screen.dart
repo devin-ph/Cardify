@@ -69,7 +69,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _studiedDays = <int>[];
     _currentStreak = 0;
     _availableDecks = <String>[];
-    _repository.watchCards();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _repository.watchCards();
+    });
     _repository.cardsNotifier.addListener(_onCardsChanged);
     _onCardsChanged();
     _loadAppStartDate();

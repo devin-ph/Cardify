@@ -274,7 +274,9 @@ class _DeckListScreenState extends State<DeckListScreen> {
   @override
   void initState() {
     super.initState();
-    _repository.watchCards();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _repository.watchCards();
+    });
     VocabularyService.instance.hintsNotifier.addListener(_onHintsChanged);
     _loadRecentAccessHistory();
     _initSpeech();

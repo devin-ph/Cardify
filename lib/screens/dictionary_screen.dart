@@ -360,7 +360,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   void initState() {
     super.initState();
     _searchController = TextEditingController();
-    _repository.watchCards();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _repository.watchCards();
+    });
   }
 
   @override
