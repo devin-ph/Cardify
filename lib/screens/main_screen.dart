@@ -17,6 +17,7 @@ import 'calendar_screen.dart';
 import 'dictionary_screen.dart';
 import 'home_screen.dart';
 import 'image_capture_screen.dart';
+import 'main_loading_screen.dart';
 import 'profile_settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -28,6 +29,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  bool _isLoading = true;
   bool _isDictionarySearching = false;
   String _userName = 'Explorer';
   String _userEmail = 'explorer@cardify.ai';
@@ -61,6 +63,15 @@ class _MainScreenState extends State<MainScreen> {
           _bindUserProfileStream();
         });
     _bindUserProfileStream();
+
+    // Show a beautiful splash loading state
+    Future.delayed(const Duration(milliseconds: 2400), () {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
   }
 
   void _bindUserProfileStream() {
@@ -88,42 +99,45 @@ class _MainScreenState extends State<MainScreen> {
         .collection('users')
         .doc(user.uid)
         .snapshots()
-        .listen((snapshot) {
-          if (!snapshot.exists) {
-            return;
-          }
-          final data = snapshot.data() ?? <String, dynamic>{};
-          if (!mounted) {
-            return;
-          }
+        .listen(
+          (snapshot) {
+            if (!snapshot.exists) {
+              return;
+            }
+            final data = snapshot.data() ?? <String, dynamic>{};
+            if (!mounted) {
+              return;
+            }
 
-          setState(() {
-            _userName = data['display_name']?.toString().trim().isNotEmpty ==
-                    true
-                ? data['display_name'].toString().trim()
-                : 'Explorer';
-            _userEmail = data['email']?.toString().trim().isNotEmpty == true
-              ? data['email'].toString().trim()
-              : (user.email ?? _userEmail);
-            _streak = (data['streak'] as num?)?.toInt() ?? _streak;
-            _experience = (data['xp'] as num?)?.toInt() ?? _experience;
-            _level = (data['level'] as num?)?.toInt() ?? _level;
-            _nextLevelExperience =
-                (data['next_level_xp'] as num?)?.toInt() ??
-                _nextLevelExperience;
-          });
+            setState(() {
+              _userName =
+                  data['display_name']?.toString().trim().isNotEmpty == true
+                  ? data['display_name'].toString().trim()
+                  : 'Explorer';
+              _userEmail = data['email']?.toString().trim().isNotEmpty == true
+                  ? data['email'].toString().trim()
+                  : (user.email ?? _userEmail);
+              _streak = (data['streak'] as num?)?.toInt() ?? _streak;
+              _experience = (data['xp'] as num?)?.toInt() ?? _experience;
+              _level = (data['level'] as num?)?.toInt() ?? _level;
+              _nextLevelExperience =
+                  (data['next_level_xp'] as num?)?.toInt() ??
+                  _nextLevelExperience;
+            });
 
-          FirestoreSyncStatus.instance.reportSuccess(
-            path: 'users/${user.uid}',
-            message: 'Đã cập nhật hồ sơ từ Firestore realtime',
-          );
-        }, onError: (Object error) {
-          FirestoreSyncStatus.instance.reportError(
-            path: 'users/${user.uid}',
-            operation: 'listen main profile',
-            error: error,
-          );
-        });
+            FirestoreSyncStatus.instance.reportSuccess(
+              path: 'users/${user.uid}',
+              message: 'Đã cập nhật hồ sơ từ Firestore realtime',
+            );
+          },
+          onError: (Object error) {
+            FirestoreSyncStatus.instance.reportError(
+              path: 'users/${user.uid}',
+              operation: 'listen main profile',
+              error: error,
+            );
+          },
+        );
   }
 
   @override
@@ -167,10 +181,8 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _onProfileTap() async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
-        builder: (context) => ProfileSettingsScreen(
-          name: _userName,
-          email: _userEmail,
-        ),
+        builder: (context) =>
+            ProfileSettingsScreen(name: _userName, email: _userEmail),
       ),
     );
 
@@ -344,7 +356,8 @@ class _MainScreenState extends State<MainScreen> {
               streak: streak,
               level: XPService.instance.levelNotifier.value,
               experience: xp,
-              nextLevelExperience: XPService.instance.levelNotifier.value * 1000,
+              nextLevelExperience:
+                  XPService.instance.levelNotifier.value * 1000,
               onOpenDecks: () => _onNavTap(3),
               onOpenDictionary: () => _onNavTap(2),
               onOpenCameraQuest: _onCameraTap,
@@ -377,7 +390,7 @@ class _MainScreenState extends State<MainScreen> {
     final showFloatingButtons =
         _currentIndex != -1 && !(_currentIndex == 2 && _isDictionarySearching);
 
-    return Scaffold(
+    final mainContent = Scaffold(
       appBar: AppBar(
         title: const Text('AI English Learning'),
         centerTitle: true,
@@ -422,6 +435,32 @@ class _MainScreenState extends State<MainScreen> {
         onTap: _onNavTap,
         onCameraTap: _onCameraTap,
       ),
+    );
+
+    return Stack(
+      children: [
+        RepaintBoundary(child: mainContent),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 900),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInOutCubic,
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            final isOut = child.key == const ValueKey('loading');
+            return FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: isOut
+                    ? Tween<double>(begin: 1.4, end: 1.0).animate(animation)
+                    : Tween<double>(begin: 0.98, end: 1.0).animate(animation),
+                child: child,
+              ),
+            );
+          },
+          child: _isLoading
+              ? const MainLoadingScreen(key: ValueKey('loading'))
+              : const SizedBox.shrink(key: ValueKey('content')),
+        ),
+      ],
     );
   }
 }
