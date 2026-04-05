@@ -203,18 +203,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Iterable<dynamic> rawDecks, {
     bool onlyAvailable = false,
   }) {
-    final sanitized = rawDecks
-        .map((item) => TopicClassifier.toVietnameseCanonical(item.toString()))
-        .map((item) => item.trim())
-        .where(
-          (item) =>
-              item.isNotEmpty &&
-              _isFlashcardDeck(item) &&
-              (!onlyAvailable || _isAvailableDeck(item)),
-        )
-        .toSet()
-        .toList()
-      ..sort((a, b) => _deckOrder(a).compareTo(_deckOrder(b)));
+    final sanitized =
+        rawDecks
+            .map(
+              (item) => TopicClassifier.toVietnameseCanonical(item.toString()),
+            )
+            .map((item) => item.trim())
+            .where(
+              (item) =>
+                  item.isNotEmpty &&
+                  _isFlashcardDeck(item) &&
+                  (!onlyAvailable || _isAvailableDeck(item)),
+            )
+            .toSet()
+            .toList()
+          ..sort((a, b) => _deckOrder(a).compareTo(_deckOrder(b)));
     return sanitized;
   }
 
@@ -374,10 +377,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _onCardsChanged() {
-    final unlockedDecks = _flashcardUnlockedDecks.where((deck) {
-      final normalizedTopic = TopicClassifier.normalizeTopic(deck);
-      return _repository.imageCountForTopic(normalizedTopic) > 0;
-    }).toList(growable: false);
+    final unlockedDecks = _flashcardUnlockedDecks
+        .where((deck) {
+          final normalizedTopic = TopicClassifier.normalizeTopic(deck);
+          return _repository.imageCountForTopic(normalizedTopic) > 0;
+        })
+        .toList(growable: false);
 
     if (!mounted) {
       _availableDecks = unlockedDecks;
@@ -469,7 +474,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final snap = await docRef.get();
       final data = snap.data();
       if (data == null) {
-        final legacySnap = await _firestore.collection('user_learning_state').doc(FirebaseAuth.instance.currentUser!.uid).get();
+        final legacySnap = await _firestore
+            .collection('user_learning_state')
+            .doc(FirebaseAuth.instance.currentUser!.uid)
+            .get();
         final legacyData = legacySnap.data();
         if (legacyData != null) {
           final legacyDecksRaw = legacyData['scheduled_decks_by_day'];
@@ -511,7 +519,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
               }
             }
           }
-          if (migratedDecks.isNotEmpty || migratedTimes.isNotEmpty || migratedStyles.isNotEmpty) {
+          if (migratedDecks.isNotEmpty ||
+              migratedTimes.isNotEmpty ||
+              migratedStyles.isNotEmpty) {
             _scheduledDecksByDay = migratedDecks;
             _scheduledTimeByDay = migratedTimes;
             _scheduledStyleByDay = migratedStyles;
@@ -580,7 +590,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
         }
       }
 
-      if (remoteDecks.isNotEmpty || remoteTimes.isNotEmpty || remoteStyles.isNotEmpty) {
+      if (remoteDecks.isNotEmpty ||
+          remoteTimes.isNotEmpty ||
+          remoteStyles.isNotEmpty) {
         if (!mounted) {
           return;
         }
@@ -665,16 +677,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _focusedDay.month,
     );
 
-    _studiedDays = List.generate(daysInMonth, (index) => index + 1)
-        .where(
-          (day) {
-            final date = DateTime(_focusedDay.year, _focusedDay.month, day);
-            return !_isBeforeAppStart(date) && _hasLearningActivityOnDate(date);
-          },
-        )
-        .toList();
+    _studiedDays = List.generate(daysInMonth, (index) => index + 1).where((
+      day,
+    ) {
+      final date = DateTime(_focusedDay.year, _focusedDay.month, day);
+      return !_isBeforeAppStart(date) && _hasLearningActivityOnDate(date);
+    }).toList();
     _currentStreak = _calculateCurrentStreak();
-      _persistStreakToProfile();
+    _persistStreakToProfile();
   }
 
   int _calculateCurrentStreak() {
@@ -775,10 +785,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: const Color(0xFFE5D4E1),
-                width: 1.2,
-              ),
+              border: Border.all(color: const Color(0xFFE5D4E1), width: 1.2),
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF9CB9D4).withValues(alpha: 0.24),
@@ -935,9 +942,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF6F9FE),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFE0E8F3),
-                        ),
+                        border: Border.all(color: const Color(0xFFE0E8F3)),
                       ),
                       child: Row(
                         children: [
@@ -979,10 +984,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   selectedTime = null;
                                 });
                               },
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                              ),
+                              icon: const Icon(Icons.close_rounded, size: 18),
                             ),
                         ],
                       ),
@@ -1068,7 +1070,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       selected.toList(),
                       selectedTime: selectedTime,
                     );
-                    if (!mounted) {
+                    if (!dialogContext.mounted) {
                       return;
                     }
                     Navigator.pop(dialogContext);
@@ -1148,7 +1150,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
           date: date,
           decks: entry.value,
           time: _scheduledTimeByDay[entry.key],
-          styleIndex: _scheduledStyleByDay[entry.key] ??
+          styleIndex:
+              _scheduledStyleByDay[entry.key] ??
               _gradientIndexForKey(entry.key),
         ),
       );
@@ -1238,7 +1241,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   onPressed: () {
                     setState(() {
                       _focusedDay = DateTime(_focusedDay.year, selectedMonth);
-                      _selectedDay = DateTime(_focusedDay.year, selectedMonth, 1);
+                      _selectedDay = DateTime(
+                        _focusedDay.year,
+                        selectedMonth,
+                        1,
+                      );
                       _refreshCalendarStats();
                     });
                     Navigator.pop(dialogContext);
@@ -1287,798 +1294,892 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Lịch học',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1D3557),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFFD7EEFF),
-                        Color(0xFFE4F6E9),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Lịch học',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1D3557),
                     ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: const Color(0xFFB8D3EE),
-                      width: 1.4,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF7FA7C6).withValues(alpha: 0.26),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.local_fire_department_rounded,
-                            color: Color(0xFFFF7B2F),
-                            size: 21,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Chuỗi ngày học: $_currentStreak ngày',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: Color(0xFF183153),
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '$totalStudyDays ngày trong tháng',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF4A6077),
-                            ),
-                          ),
-                        ],
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD7EEFF), Color(0xFFE4F6E9)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      const SizedBox(height: 12),
-                      if (recentLearningDays.isEmpty)
-                        const Text(
-                          'Chưa có ngày học nào.',
-                          style: TextStyle(color: Color(0xFF627485)),
-                        )
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: recentLearningDays.map((date) {
-                            final today = DateUtils.dateOnly(DateTime.now());
-                            final isToday = DateUtils.isSameDay(date, today);
-                            final scheduled = _hasScheduleOnDate(date);
-                            final fillColor = scheduled
-                                ? const Color(0xFFEAF8F2).withValues(alpha: 0.78)
-                                : const Color(0xFFEAF8F2).withValues(alpha: 0.78);
-                            final borderColor = scheduled
-                                ? const Color(0xFF74C69D).withValues(alpha: 0.95)
-                                : const Color(0xFF74C69D).withValues(alpha: 0.95);
-
-                            return Container(
-                              width: 36,
-                              padding: const EdgeInsets.symmetric(vertical: 5),
-                              decoration: BoxDecoration(
-                                color: fillColor,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isToday
-                                      ? const Color(0xFF183153)
-                                      : borderColor,
-                                  width: isToday ? 2 : 1,
-                                  
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF7FA7C6).withValues(alpha: 0.26),
-                                    blurRadius: 18,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    DateFormat('E').format(date).substring(0, 2),
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF516476),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${date.day}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF183153),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 1),
-                                  const Icon(
-                                    Icons.check_circle,
-                                    size: 12,
-                                    color: Color(0xFF2CB67D),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFFB8D3EE),
+                        width: 1.4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF7FA7C6,
+                          ).withValues(alpha: 0.26),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _GlassCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => _changeMonth(-1),
-                        icon: const Icon(Icons.chevron_left_rounded),
-                        tooltip: 'Tháng trước',
-                      ),
-                      Expanded(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: _openMonthYearPicker,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.calendar_month_rounded,
-                                  size: 18,
-                                  color: Color(0xFF1D3557),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.local_fire_department_rounded,
+                              color: Color(0xFFFF7B2F),
+                              size: 21,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Chuỗi ngày học: $_currentStreak ngày',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                color: Color(0xFF183153),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '$totalStudyDays ngày trong tháng',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4A6077),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (recentLearningDays.isEmpty)
+                          const Text(
+                            'Chưa có ngày học nào.',
+                            style: TextStyle(color: Color(0xFF627485)),
+                          )
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: recentLearningDays.map((date) {
+                              final today = DateUtils.dateOnly(DateTime.now());
+                              final isToday = DateUtils.isSameDay(date, today);
+                              final scheduled = _hasScheduleOnDate(date);
+                              final fillColor = scheduled
+                                  ? const Color(
+                                      0xFFEAF8F2,
+                                    ).withValues(alpha: 0.78)
+                                  : const Color(
+                                      0xFFEAF8F2,
+                                    ).withValues(alpha: 0.78);
+                              final borderColor = scheduled
+                                  ? const Color(
+                                      0xFF74C69D,
+                                    ).withValues(alpha: 0.95)
+                                  : const Color(
+                                      0xFF74C69D,
+                                    ).withValues(alpha: 0.95);
+
+                              return Container(
+                                width: 36,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 5,
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  monthLabel,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
+                                decoration: BoxDecoration(
+                                  color: fillColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isToday
+                                        ? const Color(0xFF183153)
+                                        : borderColor,
+                                    width: isToday ? 2 : 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFF7FA7C6,
+                                      ).withValues(alpha: 0.26),
+                                      blurRadius: 18,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      DateFormat(
+                                        'E',
+                                      ).format(date).substring(0, 2),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF516476),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${date.day}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF183153),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 1),
+                                    const Icon(
+                                      Icons.check_circle,
+                                      size: 12,
+                                      color: Color(0xFF2CB67D),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _GlassCard(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => _changeMonth(-1),
+                          icon: const Icon(Icons.chevron_left_rounded),
+                          tooltip: 'Tháng trước',
+                        ),
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: _openMonthYearPicker,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 18,
                                     color: Color(0xFF1D3557),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    monthLabel,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1D3557),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => _changeMonth(1),
-                        icon: const Icon(Icons.chevron_right_rounded),
-                        tooltip: 'Tháng sau',
-                      ),
-                    ],
+                        IconButton(
+                          onPressed: () => _changeMonth(1),
+                          icon: const Icon(Icons.chevron_right_rounded),
+                          tooltip: 'Tháng sau',
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                _GlassCard(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: const [
-                          Text('T2', style: TextStyle(fontWeight: FontWeight.w700)),
-                          Text('T3', style: TextStyle(fontWeight: FontWeight.w700)),
-                          Text('T4', style: TextStyle(fontWeight: FontWeight.w700)),
-                          Text('T5', style: TextStyle(fontWeight: FontWeight.w700)),
-                          Text('T6', style: TextStyle(fontWeight: FontWeight.w700)),
-                          Text('T7', style: TextStyle(fontWeight: FontWeight.w700)),
-                          Text('CN', style: TextStyle(fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 7,
-                              mainAxisSpacing: 5,
-                              crossAxisSpacing: 5,
-                              childAspectRatio: 1.12,
+                  const SizedBox(height: 10),
+                  _GlassCard(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: const [
+                            Text(
+                              'T2',
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
-                        itemCount: gridCount,
-                        itemBuilder: (context, index) {
-                          int dayNum = index - (startWeekday - 1) + 1;
-                          bool isValidDay = dayNum > 0 && dayNum <= daysInMonth;
-                          final dayDate = DateUtils.dateOnly(
-                            DateTime(
-                              _focusedDay.year,
-                              _focusedDay.month,
-                              dayNum,
+                            Text(
+                              'T3',
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
-                          );
-                          final today = DateUtils.dateOnly(DateTime.now());
-                          final scheduled =
-                              isValidDay && _hasScheduleOnDate(dayDate);
-                          final beforeAppStart =
-                              isValidDay && _isBeforeAppStart(dayDate);
-                          final isToday =
-                              isValidDay && DateUtils.isSameDay(dayDate, today);
-                          final studiedToday =
-                              isToday && _hasLearningActivityOnDate(dayDate);
-                          final isCompleted = scheduled || studiedToday;
-                          final isPast = isValidDay && dayDate.isBefore(today);
-                          final isFuture = isValidDay && dayDate.isAfter(today);
-                          final fillColor = isFuture && scheduled
-                              ? const Color(0xFFFFF3C4).withValues(alpha: 0.65)
-                              : (isPast || isToday) && isCompleted
-                                  ? const Color(0xFFE9F8F1).withValues(alpha: 0.72)
-                                  : isPast && !beforeAppStart
-                                      ? const Color(0xFFFDECEC).withValues(alpha: 0.72)
-                                      : const Color(0xFFF7FAFC).withValues(alpha: 0.55);
-                          final borderColor = isFuture && scheduled
-                              ? const Color(0xFFE1B100).withValues(alpha: 0.7)
-                              : (isPast || isToday) && isCompleted
-                                  ? const Color(0xFF8FDDBD).withValues(alpha: 0.85)
-                                  : isPast && !beforeAppStart
-                                      ? const Color(0xFFF3A2A2).withValues(alpha: 0.8)
-                                      : const Color(0xFFE4EAF1).withValues(alpha: 0.8);
-                          final icon = isFuture && scheduled
-                              ? Icons.local_offer_rounded
-                              : (isPast || isToday) && isCompleted
-                                  ? Icons.check_circle
-                                  : isPast && !beforeAppStart
-                                      ? Icons.remove_circle_outline
-                                      : Icons.circle_outlined;
-                          final iconColor = isFuture && scheduled
-                              ? const Color(0xFFE1B100)
-                              : (isPast || isToday) && isCompleted
-                                  ? const Color(0xFF2CB67D)
-                                  : isPast && !beforeAppStart
-                                      ? const Color(0xFFE45757)
-                                      : const Color(0xFFB4C2CF);
-                          final isSelected =
-                              isValidDay &&
-                              DateUtils.isSameDay(dayDate, _selectedDay);
+                            Text(
+                              'T4',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'T5',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'T6',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'T7',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'CN',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 7,
+                                mainAxisSpacing: 5,
+                                crossAxisSpacing: 5,
+                                childAspectRatio: 1.12,
+                              ),
+                          itemCount: gridCount,
+                          itemBuilder: (context, index) {
+                            int dayNum = index - (startWeekday - 1) + 1;
+                            bool isValidDay =
+                                dayNum > 0 && dayNum <= daysInMonth;
+                            final dayDate = DateUtils.dateOnly(
+                              DateTime(
+                                _focusedDay.year,
+                                _focusedDay.month,
+                                dayNum,
+                              ),
+                            );
+                            final today = DateUtils.dateOnly(DateTime.now());
+                            final scheduled =
+                                isValidDay && _hasScheduleOnDate(dayDate);
+                            final beforeAppStart =
+                                isValidDay && _isBeforeAppStart(dayDate);
+                            final isToday =
+                                isValidDay &&
+                                DateUtils.isSameDay(dayDate, today);
+                            final studiedToday =
+                                isToday && _hasLearningActivityOnDate(dayDate);
+                            final isCompleted = scheduled || studiedToday;
+                            final isPast =
+                                isValidDay && dayDate.isBefore(today);
+                            final isFuture =
+                                isValidDay && dayDate.isAfter(today);
+                            final fillColor = isFuture && scheduled
+                                ? const Color(
+                                    0xFFFFF3C4,
+                                  ).withValues(alpha: 0.65)
+                                : (isPast || isToday) && isCompleted
+                                ? const Color(
+                                    0xFFE9F8F1,
+                                  ).withValues(alpha: 0.72)
+                                : isPast && !beforeAppStart
+                                ? const Color(
+                                    0xFFFDECEC,
+                                  ).withValues(alpha: 0.72)
+                                : const Color(
+                                    0xFFF7FAFC,
+                                  ).withValues(alpha: 0.55);
+                            final borderColor = isFuture && scheduled
+                                ? const Color(0xFFE1B100).withValues(alpha: 0.7)
+                                : (isPast || isToday) && isCompleted
+                                ? const Color(
+                                    0xFF8FDDBD,
+                                  ).withValues(alpha: 0.85)
+                                : isPast && !beforeAppStart
+                                ? const Color(0xFFF3A2A2).withValues(alpha: 0.8)
+                                : const Color(
+                                    0xFFE4EAF1,
+                                  ).withValues(alpha: 0.8);
+                            final icon = isFuture && scheduled
+                                ? Icons.local_offer_rounded
+                                : (isPast || isToday) && isCompleted
+                                ? Icons.check_circle
+                                : isPast && !beforeAppStart
+                                ? Icons.remove_circle_outline
+                                : Icons.circle_outlined;
+                            final iconColor = isFuture && scheduled
+                                ? const Color(0xFFE1B100)
+                                : (isPast || isToday) && isCompleted
+                                ? const Color(0xFF2CB67D)
+                                : isPast && !beforeAppStart
+                                ? const Color(0xFFE45757)
+                                : const Color(0xFFB4C2CF);
+                            final isSelected =
+                                isValidDay &&
+                                DateUtils.isSameDay(dayDate, _selectedDay);
 
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            onTap: isValidDay
-                                ? () {
-                                    setState(() {
-                                      _selectedDay = dayDate;
-                                    });
-                                  }
-                                : null,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              decoration: BoxDecoration(
-                                color: isValidDay
-                                    ? fillColor
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                border: isValidDay
-                                    ? Border.all(
-                                        color: isToday
-                                            ? const Color(0xFF1D3557)
-                                            : isSelected
-                                                ? const Color(0xFF1D3557)
-                                                : borderColor,
-                                        width: isToday
-                                            ? 2
-                                            : isSelected
-                                                ? 1.5
-                                                : 1,
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(10),
+                              onTap: isValidDay
+                                  ? () {
+                                      setState(() {
+                                        _selectedDay = dayDate;
+                                      });
+                                    }
+                                  : null,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                decoration: BoxDecoration(
+                                  color: isValidDay
+                                      ? fillColor
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: isValidDay
+                                      ? Border.all(
+                                          color: isToday
+                                              ? const Color(0xFF1D3557)
+                                              : isSelected
+                                              ? const Color(0xFF1D3557)
+                                              : borderColor,
+                                          width: isToday
+                                              ? 2
+                                              : isSelected
+                                              ? 1.5
+                                              : 1,
+                                        )
+                                      : null,
+                                ),
+                                child: isValidDay
+                                    ? Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            '$dayNum',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: beforeAppStart
+                                                  ? const Color(0xFF98A6B8)
+                                                  : const Color(0xFF1D3557),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 0),
+                                          Icon(
+                                            icon,
+                                            size: 12,
+                                            color: iconColor,
+                                          ),
+                                        ],
                                       )
                                     : null,
                               ),
-                              child: isValidDay
-                                  ? Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          '$dayNum',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: beforeAppStart
-                                                ? const Color(0xFF98A6B8)
-                                                : const Color(0xFF1D3557),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 0),
-                                        Icon(icon, size: 12, color: iconColor),
-                                      ],
-                                    )
-                                  : null,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                _GlassCard(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFFFFEFE0).withValues(alpha: 0.94),
-                              const Color(0xFFF8E7FF).withValues(alpha: 0.9),
-                              const Color(0xFFE7F4FF).withValues(alpha: 0.88),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(0xFFE4C8D5).withValues(alpha: 0.9),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFC89FB9).withValues(alpha: 0.2),
-                              blurRadius: 16,
-                              offset: const Offset(0, 8),
-                            ),
-                            BoxShadow(
-                              color: const Color(0xFF7EA7C9).withValues(alpha: 0.08),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.45),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                  ),
-                                ),
-                                child: Image.asset(
-                                  'assets/onboarding/test.png',
-                                  height: 54,
-                                  width: 54,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Bộ thẻ ngày',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1D3557),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    DateFormat('dd/MM/yyyy').format(_selectedDay),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF5D738A),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            TextButton.icon(
-                              onPressed: _openDeckPickerForSelectedDay,
-                              style: TextButton.styleFrom(
-                                backgroundColor: const Color(0xFF1D3557),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              icon: const Icon(
-                                Icons.edit_calendar_rounded,
-                                size: 17,
-                              ),
-                              label: const Text('Chọn'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Các bộ thẻ đã gán',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF637A90),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (selectedDateDecks.isEmpty)
+                  const SizedBox(height: 12),
+                  _GlassCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Container(
-                          width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF7FAFC).withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: const Color(0xFFE4EAF1).withValues(alpha: 0.8),
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFFFFEFE0).withValues(alpha: 0.94),
+                                const Color(0xFFF8E7FF).withValues(alpha: 0.9),
+                                const Color(0xFFE7F4FF).withValues(alpha: 0.88),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                          ),
-                          child: const Text(
-                            'Chưa có bộ thẻ nào cho ngày này. Hãy thêm để tạo kế hoạch học.',
-                            style: TextStyle(color: Color(0xFF627485)),
-                          ),
-                        )
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: selectedDateDecks
-                              .map(
-                                (deck) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        const Color(0xFFEAF3FE).withValues(alpha: 0.92),
-                                        const Color(0xFFF1ECFF).withValues(alpha: 0.9),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: const Color(0xFFD8E7F6).withValues(alpha: 0.92),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    deck,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF1D3557),
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _GlassCard(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Lịch sắp tới',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1D3557),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (upcomingSchedules.isEmpty)
-                        const Text(
-                          'Bạn chưa có lịch học sắp tới.',
-                          style: TextStyle(color: Color(0xFF627485)),
-                        )
-                      else
-                        Column(
-                          children: upcomingSchedules.map((schedule) {
-                            final dayLabel = _upcomingCountdownLabel(schedule);
-                            final shortMonth = DateFormat('MM').format(
-                              schedule.date,
-                            );
-                            final scheduleGradient = _gradientForScheduleKey(
-                              _dateKey(schedule.date),
-                            );
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: scheduleGradient
-                                      .map((color) => color.withValues(alpha: 0.86))
-                                      .toList(),
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: scheduleGradient.first.withValues(alpha: 0.86),
-                                  width: 1.1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: scheduleGradient.last.withValues(alpha: 0.24),
-                                    blurRadius: 18,
-                                    offset: const Offset(0, 9),
-                                  ),
-                                  BoxShadow(
-                                    color: const Color(0xFF2B4A62).withValues(alpha: 0.08),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(
+                                0xFFE4C8D5,
+                              ).withValues(alpha: 0.9),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFFC89FB9,
+                                ).withValues(alpha: 0.2),
+                                blurRadius: 16,
+                                offset: const Offset(0, 8),
                               ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 52,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEAF3FE).withValues(alpha: 0.86),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: const Color(0xFFD4E5F7),
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF7EA7C9,
+                                ).withValues(alpha: 0.08),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.45),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.8,
                                       ),
                                     ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${schedule.date.day}',
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w800,
-                                            color: Color(0xFF1D3557),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Thg $shortMonth',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF5D738A),
-                                          ),
-                                        ),
-                                      ],
+                                  ),
+                                  child: Image.asset(
+                                    'assets/onboarding/test.png',
+                                    height: 54,
+                                    width: 54,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Bộ thẻ ngày',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1D3557),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      DateFormat(
+                                        'dd/MM/yyyy',
+                                      ).format(_selectedDay),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF5D738A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton.icon(
+                                onPressed: _openDeckPickerForSelectedDay,
+                                style: TextButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1D3557),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                icon: const Icon(
+                                  Icons.edit_calendar_rounded,
+                                  size: 17,
+                                ),
+                                label: const Text('Chọn'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Các bộ thẻ đã gán',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF637A90),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (selectedDateDecks.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFFF7FAFC,
+                              ).withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(
+                                  0xFFE4EAF1,
+                                ).withValues(alpha: 0.8),
+                              ),
+                            ),
+                            child: const Text(
+                              'Chưa có bộ thẻ nào cho ngày này. Hãy thêm để tạo kế hoạch học.',
+                              style: TextStyle(color: Color(0xFF627485)),
+                            ),
+                          )
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: selectedDateDecks
+                                .map(
+                                  (deck) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          const Color(
+                                            0xFFEAF3FE,
+                                          ).withValues(alpha: 0.92),
+                                          const Color(
+                                            0xFFF1ECFF,
+                                          ).withValues(alpha: 0.9),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFFD8E7F6,
+                                        ).withValues(alpha: 0.92),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      deck,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1D3557),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                _weekdayVi(schedule.date),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Color(0xFF1D3557),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 5,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEAF3FE).withValues(alpha: 0.72),
-                                                borderRadius: BorderRadius.circular(20),
-                                              ),
-                                              child: Text(
-                                                dayLabel,
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Color(0xFF1D3557),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Container(
-                                              width: 30,
-                                              height: 30,
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withValues(alpha: 0.82),
-                                                borderRadius: BorderRadius.circular(10),
-                                                border: Border.all(
-                                                  color: const Color(0xFFE8D7DE),
-                                                ),
-                                              ),
-                                              child: IconButton(
-                                                padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(),
-                                                iconSize: 16,
-                                                tooltip: 'Xoá lịch',
-                                                onPressed: () => _confirmDeleteScheduledDay(schedule),
-                                                icon: const Icon(
-                                                  Icons.delete_outline_rounded,
-                                                  color: Color(0xFFE45757),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                )
+                                .toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _GlassCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Lịch sắp tới',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1D3557),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (upcomingSchedules.isEmpty)
+                          const Text(
+                            'Bạn chưa có lịch học sắp tới.',
+                            style: TextStyle(color: Color(0xFF627485)),
+                          )
+                        else
+                          Column(
+                            children: upcomingSchedules.map((schedule) {
+                              final dayLabel = _upcomingCountdownLabel(
+                                schedule,
+                              );
+                              final shortMonth = DateFormat(
+                                'MM',
+                              ).format(schedule.date);
+                              final scheduleGradient = _gradientForScheduleKey(
+                                _dateKey(schedule.date),
+                              );
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: scheduleGradient
+                                        .map(
+                                          (color) =>
+                                              color.withValues(alpha: 0.86),
+                                        )
+                                        .toList(),
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: scheduleGradient.first.withValues(
+                                      alpha: 0.86,
+                                    ),
+                                    width: 1.1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: scheduleGradient.last.withValues(
+                                        alpha: 0.24,
+                                      ),
+                                      blurRadius: 18,
+                                      offset: const Offset(0, 9),
+                                    ),
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFF2B4A62,
+                                      ).withValues(alpha: 0.08),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 52,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFFEAF3FE,
+                                        ).withValues(alpha: 0.86),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: const Color(0xFFD4E5F7),
                                         ),
-                                        const SizedBox(height: 6),
-                                        if (schedule.time != null)
-                                          Padding(
-                                            padding: const EdgeInsets.only(bottom: 6),
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.schedule,
-                                                  size: 14,
-                                                  color: Color(0xFF5D738A),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'Giờ học: ${_formatTimeLabel(schedule.time)}',
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF5D738A),
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${schedule.date.day}',
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF1D3557),
                                             ),
                                           ),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 6,
-                                          children: [
-                                            ...schedule.decks
-                                                .take(4)
-                                                .map(
-                                                  (deck) => Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFE9F8F1).withValues(alpha: 0.82),
-                                                      borderRadius: BorderRadius.circular(999),
-                                                      border: Border.all(
-                                                        color: const Color(0xFFBEE9D2),
-                                                      ),
-                                                    ),
-                                                    child: Text(
-                                                      deck,
-                                                      style: const TextStyle(
-                                                        color: Color(0xFF2B4A62),
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Thg $shortMonth',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF5D738A),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  _weekdayVi(schedule.date),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF1D3557),
                                                   ),
-                                                )
-                                                .toList(),
-                                            if (schedule.decks.length > 4)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 4,
                                                 ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 5,
+                                                    ),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFFF1F5FB).withValues(alpha: 0.85),
-                                                  borderRadius: BorderRadius.circular(999),
+                                                  color: const Color(
+                                                    0xFFEAF3FE,
+                                                  ).withValues(alpha: 0.72),
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
                                                 ),
                                                 child: Text(
-                                                  '+${schedule.decks.length - 4}',
+                                                  dayLabel,
                                                   style: const TextStyle(
-                                                    color: Color(0xFF516476),
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF1D3557),
                                                   ),
                                                 ),
                                               ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${schedule.decks.length} bộ thẻ',
-                                          style: const TextStyle(
-                                            color: Color(0xFF637A90),
-                                            fontSize: 11,
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                width: 30,
+                                                height: 30,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.82),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  border: Border.all(
+                                                    color: const Color(
+                                                      0xFFE8D7DE,
+                                                    ),
+                                                  ),
+                                                ),
+                                                child: IconButton(
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                  iconSize: 16,
+                                                  tooltip: 'Xoá lịch',
+                                                  onPressed: () =>
+                                                      _confirmDeleteScheduledDay(
+                                                        schedule,
+                                                      ),
+                                                  icon: const Icon(
+                                                    Icons
+                                                        .delete_outline_rounded,
+                                                    color: Color(0xFFE45757),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 6),
+                                          if (schedule.time != null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 6,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.schedule,
+                                                    size: 14,
+                                                    color: Color(0xFF5D738A),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'Giờ học: ${_formatTimeLabel(schedule.time)}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF5D738A),
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: [
+                                              ...schedule.decks
+                                                  .take(4)
+                                                  .map(
+                                                    (deck) => Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color:
+                                                            const Color(
+                                                              0xFFE9F8F1,
+                                                            ).withValues(
+                                                              alpha: 0.82,
+                                                            ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              999,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: const Color(
+                                                            0xFFBEE9D2,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      child: Text(
+                                                        deck,
+                                                        style: const TextStyle(
+                                                          color: Color(
+                                                            0xFF2B4A62,
+                                                          ),
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              if (schedule.decks.length > 4)
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFFF1F5FB,
+                                                    ).withValues(alpha: 0.85),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          999,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    '+${schedule.decks.length - 4}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF516476),
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${schedule.decks.length} bộ thẻ',
+                                            style: const TextStyle(
+                                              color: Color(0xFF637A90),
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                    ],
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _LegendDot({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF516476),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 }

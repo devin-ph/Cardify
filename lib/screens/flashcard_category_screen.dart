@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flip_card/flip_card.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:convert';
@@ -1374,7 +1374,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                               ? Image.network(
                                   selectedImageUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Icon(
+                                  errorBuilder: (_, _, _) => Icon(
                                     _iconForTopic(displayTopic),
                                     color: const Color(0xFF0A5DB6),
                                     size: 34,
@@ -3125,7 +3125,7 @@ class FlashcardFront extends StatelessWidget {
   final VoidCallback onSpeak;
   final double width;
   final double height;
-  FlashcardFront({
+  const FlashcardFront({
     super.key,
     required this.flashcard,
     required this.isKnown,
@@ -3140,7 +3140,7 @@ class FlashcardFront extends StatelessWidget {
       return Image.memory(
         flashcard.imageBytes!,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackIcon(),
+        errorBuilder: (_, _, _) => _fallbackIcon(),
       );
     }
 
@@ -3154,14 +3154,14 @@ class FlashcardFront extends StatelessWidget {
       return Image.network(
         source,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackIcon(),
+        errorBuilder: (_, _, _) => _fallbackIcon(),
       );
     }
 
     return Image.asset(
       source,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _fallbackIcon(),
+      errorBuilder: (_, _, _) => _fallbackIcon(),
     );
   }
 
@@ -3260,7 +3260,7 @@ class FlashcardBack extends StatelessWidget {
   final VoidCallback onSpeak;
   final double width;
   final double height;
-  FlashcardBack({
+  const FlashcardBack({
     super.key,
     required this.flashcard,
     required this.isKnown,
@@ -3275,7 +3275,7 @@ class FlashcardBack extends StatelessWidget {
       return Image.memory(
         flashcard.imageBytes!,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackIcon(),
+        errorBuilder: (_, _, _) => _fallbackIcon(),
       );
     }
 
@@ -3288,14 +3288,14 @@ class FlashcardBack extends StatelessWidget {
       return Image.network(
         source,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackIcon(),
+        errorBuilder: (_, _, _) => _fallbackIcon(),
       );
     }
 
     return Image.asset(
       source,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _fallbackIcon(),
+      errorBuilder: (_, _, _) => _fallbackIcon(),
     );
   }
 

@@ -717,7 +717,7 @@ class _ImageCaptureScreenState extends State<ImageCaptureScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(0.9),
+        color: Colors.redAccent.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(

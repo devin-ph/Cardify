@@ -307,7 +307,7 @@ class _PageIndicator extends StatelessWidget {
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF6D3BF5).withOpacity(0.35),
+                      color: const Color(0xFF6D3BF5).withValues(alpha: 0.35),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -336,7 +336,7 @@ class _PrimaryActionButton extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6D3BF5).withOpacity(0.25),
+            color: const Color(0xFF6D3BF5).withValues(alpha: 0.25),
             blurRadius: 28,
             offset: const Offset(0, 16),
           ),
@@ -755,11 +755,11 @@ class _FrostedCard extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 28,
             offset: const Offset(0, 16),
           ),
@@ -814,7 +814,7 @@ class _AchievementCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(34),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.09),
+            color: Colors.black.withValues(alpha: 0.09),
             blurRadius: 30,
             offset: const Offset(0, 16),
           ),
@@ -828,7 +828,7 @@ class _AchievementCard extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.14),
+              color: iconColor.withValues(alpha: 0.14),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: iconColor, size: 32),

@@ -563,7 +563,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                           radius: 28,
                           backgroundColor: const Color(
                             0xFF1E3A8A,
-                          ).withOpacity(0.12),
+                          ).withValues(alpha: 0.12),
                           backgroundImage: _avatarBytes != null
                               ? MemoryImage(_avatarBytes!)
                               : null,

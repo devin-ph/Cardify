@@ -559,13 +559,13 @@ class _AiVoiceChatDialogState extends State<AiVoiceChatDialog>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      orbColor.withOpacity(0.95),
-                      orbColor.withOpacity(0.65),
+                      orbColor.withValues(alpha: 0.95),
+                      orbColor.withValues(alpha: 0.65),
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: orbColor.withOpacity(0.45),
+                      color: orbColor.withValues(alpha: 0.45),
                       blurRadius: 22,
                       spreadRadius: 4,
                     ),

@@ -1,7 +1,6 @@
 import 'topic_classifier.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -148,7 +147,7 @@ class SavedCardsRepository {
 
     if (topic != null && topic.trim().isNotEmpty) {
       final knownWords = _knownWordsForTopic(topic);
-      if (knownWords != null && knownWords.remove(key)) {
+      if (knownWords.remove(key)) {
         if (knownWords.isEmpty) {
           _knownWordsByTopic.remove(TopicClassifier.toVietnameseCanonical(topic));
         }
@@ -228,7 +227,7 @@ class SavedCardsRepository {
       'meaning': card.meaning,
       'example': card.example,
       'word_type': card.wordType,
-      if (encodedImage != null) 'image_bytes_base64': encodedImage,
+      'image_bytes_base64': ?encodedImage,
       'image_url': card.imageUrl,
       'saved_at': card.savedAt.toIso8601String(),
     };
@@ -533,7 +532,7 @@ class SavedCardsRepository {
         'word_type': wordType,
         'example': example.trim(),
         if (removeImage) 'image_url': null,
-        if (imageUrl != null) 'image_url': imageUrl,
+        'image_url': ?imageUrl,
         'saved_at': timestamp.toIso8601String(),
       };
 
@@ -620,7 +619,7 @@ class SavedCardsRepository {
               'meaning': result.vietnameseMeaning,
               'word_type': result.wordType,
               'example': result.exampleSentence,
-              if (imageUrl != null) 'image_url': imageUrl,
+              'image_url': ?imageUrl,
               'saved_at': timestamp.toIso8601String(),
             })
             .eq('user_id', uid)

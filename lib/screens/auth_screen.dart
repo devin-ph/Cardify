@@ -731,7 +731,7 @@ class _SocialButton extends StatelessWidget {
                   vertical: 12,
                   horizontal: 14,
                 ),
-                backgroundColor: Colors.white.withOpacity(0.42),
+                backgroundColor: Colors.white.withValues(alpha: 0.42),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
